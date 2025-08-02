@@ -75,12 +75,494 @@ get_video_selection() {
     done
 }
 
+# Function to display available desktop effects
+show_desktop_effects() {
+    echo "Available desktop effects:"
+    echo "1) none      - Disable all effects (best performance)"
+    echo "2) minimal   - Basic window animations only"
+    echo "3) standard  - Window animations + transparency"
+    echo "4) enhanced  - Full effects with shadows and blur"
+    echo "5) custom    - Configure individual effects"
+}
+
+# Function to get desktop effects selection
+get_desktop_effects() {
+    local effects_choice
+    while true; do
+        show_desktop_effects
+        echo
+        read -p "Select desktop effects level (1-5): " effects_choice
+        
+        case $effects_choice in
+            1) echo "none"; break ;;
+            2) echo "minimal"; break ;;
+            3) echo "standard"; break ;;
+            4) echo "enhanced"; break ;;
+            5) echo "custom"; break ;;
+            *) echo "Invalid selection. Please choose 1-5." ;;
+        esac
+    done
+}
+
+# Function to configure compositing manager
+configure_compositing() {
+    local effects_level="$1"
+    
+    echo "Configuring desktop compositing..."
+    
+    # Check if compton/picom is available
+    local compositor=""
+    if command -v picom &> /dev/null; then
+        compositor="picom"
+    elif command -v compton &> /dev/null; then
+        compositor="compton"
+    else
+        echo "Installing picom compositor..."
+        sudo apt update && sudo apt install -y picom
+        compositor="picom"
+    fi
+    
+    # Create compositor config directory
+    mkdir -p "$HOME/.config/picom"
+    
+    case $effects_level in
+        "none")
+            configure_no_effects
+            ;;
+        "minimal")
+            configure_minimal_effects "$compositor"
+            ;;
+        "standard")
+            configure_standard_effects "$compositor"
+            ;;
+        "enhanced")
+            configure_enhanced_effects "$compositor"
+            ;;
+        "custom")
+            configure_custom_effects "$compositor"
+            ;;
+    esac
+}
+
+# Function to disable all effects
+configure_no_effects() {
+    echo "Disabling desktop compositing..."
+    
+    # Stop any running compositor
+    pkill -f "picom\|compton" 2>/dev/null || true
+    
+    # Remove autostart entries
+    local autostart_dir="$HOME/.config/autostart"
+    mkdir -p "$autostart_dir"
+    rm -f "$autostart_dir/picom.desktop" "$autostart_dir/compton.desktop"
+    
+    echo "✓ Desktop effects disabled"
+}
+
+# Function to configure minimal effects
+configure_minimal_effects() {
+    local compositor="$1"
+    
+    cat > "$HOME/.config/picom/picom.conf" << 'EOF'
+# Minimal Desktop Effects Configuration
+# Basic window animations only
+
+# Backend
+backend = "glx";
+glx-no-stencil = true;
+glx-copy-from-front = false;
+
+# Shadows (disabled for performance)
+shadow = false;
+
+# Opacity (minimal)
+inactive-opacity = 1.0;
+active-opacity = 1.0;
+frame-opacity = 1.0;
+inactive-opacity-override = false;
+
+# Fading
+fading = true;
+fade-delta = 4;
+fade-in-step = 0.03;
+fade-out-step = 0.03;
+fade-exclude = [];
+
+# Window type settings
+wintypes:
+{
+    tooltip = { fade = true; shadow = false; opacity = 0.95; focus = true; };
+    dock = { shadow = false; };
+    dnd = { shadow = false; };
+    popup_menu = { opacity = 0.95; };
+    dropdown_menu = { opacity = 0.95; };
+};
+
+# Performance optimizations
+vsync = true;
+mark-wmwin-focused = true;
+mark-ovredir-focused = true;
+detect-rounded-corners = true;
+detect-client-opacity = true;
+refresh-rate = 0;
+detect-transient = true;
+detect-client-leader = true;
+EOF
+    
+    create_compositor_autostart "$compositor"
+    start_compositor "$compositor"
+    echo "✓ Minimal desktop effects configured"
+}
+
+# Function to configure standard effects
+configure_standard_effects() {
+    local compositor="$1"
+    
+    cat > "$HOME/.config/picom/picom.conf" << 'EOF'
+# Standard Desktop Effects Configuration
+# Window animations + basic transparency
+
+# Backend
+backend = "glx";
+glx-no-stencil = true;
+glx-copy-from-front = false;
+
+# Shadows
+shadow = true;
+shadow-radius = 8;
+shadow-offset-x = -8;
+shadow-offset-y = -8;
+shadow-opacity = 0.3;
+shadow-exclude = [
+    "name = 'Notification'",
+    "class_g = 'Conky'",
+    "class_g ?= 'Notify-osd'",
+    "class_g = 'Cairo-clock'",
+    "_GTK_FRAME_EXTENTS@:c"
+];
+
+# Opacity
+inactive-opacity = 0.9;
+active-opacity = 1.0;
+frame-opacity = 0.9;
+inactive-opacity-override = false;
+
+# Opacity rules
+opacity-rule = [
+    "90:class_g = 'LXTerminal'",
+    "95:class_g = 'PCManFM'",
+    "100:class_g = 'firefox'",
+    "100:class_g = 'chromium'"
+];
+
+# Fading
+fading = true;
+fade-delta = 5;
+fade-in-step = 0.05;
+fade-out-step = 0.05;
+
+# Window type settings
+wintypes:
+{
+    tooltip = { fade = true; shadow = true; opacity = 0.95; focus = true; };
+    dock = { shadow = false; };
+    dnd = { shadow = false; };
+    popup_menu = { opacity = 0.95; shadow = true; };
+    dropdown_menu = { opacity = 0.95; shadow = true; };
+};
+
+# Performance settings
+vsync = true;
+mark-wmwin-focused = true;
+mark-ovredir-focused = true;
+detect-rounded-corners = true;
+detect-client-opacity = true;
+refresh-rate = 0;
+detect-transient = true;
+detect-client-leader = true;
+EOF
+    
+    create_compositor_autostart "$compositor"
+    start_compositor "$compositor"
+    echo "✓ Standard desktop effects configured"
+}
+
+# Function to configure enhanced effects
+configure_enhanced_effects() {
+    local compositor="$1"
+    
+    cat > "$HOME/.config/picom/picom.conf" << 'EOF'
+# Enhanced Desktop Effects Configuration
+# Full effects with shadows, blur, and animations
+
+# Backend
+backend = "glx";
+glx-no-stencil = true;
+glx-copy-from-front = false;
+
+# Shadows
+shadow = true;
+shadow-radius = 12;
+shadow-offset-x = -10;
+shadow-offset-y = -10;
+shadow-opacity = 0.4;
+shadow-exclude = [
+    "name = 'Notification'",
+    "class_g = 'Conky'",
+    "class_g ?= 'Notify-osd'",
+    "class_g = 'Cairo-clock'",
+    "_GTK_FRAME_EXTENTS@:c"
+];
+
+# Blur
+blur-background = true;
+blur-background-frame = true;
+blur-method = "dual_kawase";
+blur-strength = 3;
+blur-background-exclude = [
+    "window_type = 'dock'",
+    "window_type = 'desktop'",
+    "_GTK_FRAME_EXTENTS@:c"
+];
+
+# Opacity
+inactive-opacity = 0.85;
+active-opacity = 1.0;
+frame-opacity = 0.8;
+inactive-opacity-override = false;
+
+# Opacity rules
+opacity-rule = [
+    "85:class_g = 'LXTerminal'",
+    "90:class_g = 'PCManFM'",
+    "100:class_g = 'firefox'",
+    "100:class_g = 'chromium'",
+    "80:class_g = 'lxpanel'",
+    "95:class_g = 'Menu'"
+];
+
+# Fading
+fading = true;
+fade-delta = 7;
+fade-in-step = 0.07;
+fade-out-step = 0.07;
+
+# Corners (if supported)
+corner-radius = 8;
+rounded-corners-exclude = [
+    "window_type = 'dock'",
+    "window_type = 'desktop'"
+];
+
+# Window type settings
+wintypes:
+{
+    tooltip = { fade = true; shadow = true; opacity = 0.95; focus = true; full-shadow = false; };
+    dock = { shadow = false; clip-shadow-above = true; };
+    dnd = { shadow = false; };
+    popup_menu = { opacity = 0.9; shadow = true; blur-background = false; };
+    dropdown_menu = { opacity = 0.9; shadow = true; blur-background = false; };
+};
+
+# Performance settings
+vsync = true;
+mark-wmwin-focused = true;
+mark-ovredir-focused = true;
+detect-rounded-corners = true;
+detect-client-opacity = true;
+refresh-rate = 60;
+detect-transient = true;
+detect-client-leader = true;
+EOF
+    
+    create_compositor_autostart "$compositor"
+    start_compositor "$compositor"
+    echo "✓ Enhanced desktop effects configured"
+}
+
+# Function to configure custom effects
+configure_custom_effects() {
+    local compositor="$1"
+    
+    echo "Custom effects configuration:"
+    echo
+    
+    # Get user preferences for each effect
+    read -p "Enable window shadows? (y/n): " enable_shadows
+    read -p "Enable window transparency? (y/n): " enable_transparency
+    read -p "Enable window blur? (y/n): " enable_blur
+    read -p "Enable fading animations? (y/n): " enable_fading
+    read -p "Enable rounded corners? (y/n): " enable_corners
+    
+    # Shadow settings
+    local shadow_config=""
+    if [[ $enable_shadows =~ ^[Yy]$ ]]; then
+        echo
+        read -p "Shadow radius (1-20, default 10): " shadow_radius
+        read -p "Shadow opacity (0.1-1.0, default 0.3): " shadow_opacity
+        shadow_radius=${shadow_radius:-10}
+        shadow_opacity=${shadow_opacity:-0.3}
+        
+        shadow_config="shadow = true;
+shadow-radius = ${shadow_radius};
+shadow-offset-x = -${shadow_radius};
+shadow-offset-y = -${shadow_radius};
+shadow-opacity = ${shadow_opacity};"
+    else
+        shadow_config="shadow = false;"
+    fi
+    
+    # Transparency settings
+    local opacity_config=""
+    if [[ $enable_transparency =~ ^[Yy]$ ]]; then
+        echo
+        read -p "Inactive window opacity (0.1-1.0, default 0.9): " inactive_opacity
+        inactive_opacity=${inactive_opacity:-0.9}
+        
+        opacity_config="inactive-opacity = ${inactive_opacity};
+active-opacity = 1.0;
+frame-opacity = 0.9;"
+    else
+        opacity_config="inactive-opacity = 1.0;
+active-opacity = 1.0;
+frame-opacity = 1.0;"
+    fi
+    
+    # Blur settings
+    local blur_config=""
+    if [[ $enable_blur =~ ^[Yy]$ ]]; then
+        echo
+        read -p "Blur strength (1-10, default 3): " blur_strength
+        blur_strength=${blur_strength:-3}
+        
+        blur_config="blur-background = true;
+blur-background-frame = true;
+blur-method = \"dual_kawase\";
+blur-strength = ${blur_strength};"
+    else
+        blur_config="blur-background = false;"
+    fi
+    
+    # Fading settings
+    local fading_config=""
+    if [[ $enable_fading =~ ^[Yy]$ ]]; then
+        echo
+        read -p "Fade speed (1-10, default 5): " fade_speed
+        fade_speed=${fade_speed:-5}
+        
+        fading_config="fading = true;
+fade-delta = ${fade_speed};
+fade-in-step = 0.0$(printf "%02d" $((fade_speed * 10)));
+fade-out-step = 0.0$(printf "%02d" $((fade_speed * 10)));"
+    else
+        fading_config="fading = false;"
+    fi
+    
+    # Corner settings
+    local corner_config=""
+    if [[ $enable_corners =~ ^[Yy]$ ]]; then
+        echo
+        read -p "Corner radius (1-20, default 8): " corner_radius
+        corner_radius=${corner_radius:-8}
+        
+        corner_config="corner-radius = ${corner_radius};
+rounded-corners-exclude = [
+    \"window_type = 'dock'\",
+    \"window_type = 'desktop'\"
+];"
+    fi
+    
+    # Generate custom config file
+    cat > "$HOME/.config/picom/picom.conf" << EOF
+# Custom Desktop Effects Configuration
+
+# Backend
+backend = "glx";
+glx-no-stencil = true;
+glx-copy-from-front = false;
+
+# Shadows
+${shadow_config}
+
+# Opacity
+${opacity_config}
+
+# Blur
+${blur_config}
+
+# Fading
+${fading_config}
+
+# Corners
+${corner_config}
+
+# Window type settings
+wintypes:
+{
+    tooltip = { fade = true; shadow = false; opacity = 0.95; focus = true; };
+    dock = { shadow = false; };
+    dnd = { shadow = false; };
+    popup_menu = { opacity = 0.95; };
+    dropdown_menu = { opacity = 0.95; };
+};
+
+# Performance settings
+vsync = true;
+mark-wmwin-focused = true;
+mark-ovredir-focused = true;
+detect-rounded-corners = true;
+detect-client-opacity = true;
+refresh-rate = 0;
+detect-transient = true;
+detect-client-leader = true;
+EOF
+    
+    create_compositor_autostart "$compositor"
+    start_compositor "$compositor"
+    echo "✓ Custom desktop effects configured"
+}
+
+# Function to create compositor autostart entry
+create_compositor_autostart() {
+    local compositor="$1"
+    local autostart_dir="$HOME/.config/autostart"
+    
+    mkdir -p "$autostart_dir"
+    
+    cat > "$autostart_dir/picom.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=Picom Compositor
+Comment=Desktop compositing manager
+Exec=${compositor} --config ~/.config/picom/picom.conf
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+    
+    echo "✓ Compositor autostart configured"
+}
+
+# Function to start compositor
+start_compositor() {
+    local compositor="$1"
+    
+    # Stop any running compositor first
+    pkill -f "picom\|compton" 2>/dev/null || true
+    sleep 1
+    
+    # Start new compositor in background
+    "$compositor" --config "$HOME/.config/picom/picom.conf" --daemon
+    
+    echo "✓ Compositor started"
+}
+
 # Check if background images directory exists
 BACKGROUND_SOURCE="/var/tmp/raspberry-config/theme/background"
 BACKGROUND_DEST="/usr/share/background"
 
 # Video configuration
-VIDEO_SOURCE="/var/tmp/raspberry-config/theme/background"
+VIDEO_SOURCE="/var/tmp/raspberry-config/theme/videos"
 VIDEO_DEST="/usr/share/openautopro"
 SERVICE_SOURCE="/var/tmp/raspberry-config/theme/openautopro.splash.service"
 SERVICE_DEST="/etc/systemd/system/openautopro.splash.service"
@@ -271,9 +753,28 @@ else
     rm -f "$temp_service"
 fi
 
+# Handle desktop effects configuration
+echo
+echo "Configuring desktop effects..."
+
+# Handle desktop effects selection based on mode
+if [ "$NON_INTERACTIVE" = true ]; then
+    # Non-interactive mode: use minimal effects for best performance
+    selected_effects="minimal"
+    echo "Auto-selected desktop effects: $selected_effects"
+else
+    # Interactive mode: get effects selection
+    echo
+    selected_effects=$(get_desktop_effects)
+fi
+
+# Configure the selected effects
+configure_compositing "$selected_effects"
+
 echo
 echo "Theme installation completed!"
 echo "✓ Wallpaper configuration applied"
 echo "✓ Startup video configuration applied"
+echo "✓ Desktop effects configuration applied"
 echo
 echo "Note: You may need to reboot for the startup video changes to take effect."
