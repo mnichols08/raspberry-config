@@ -5,6 +5,7 @@ A comprehensive collection of scripts for setting up and configuring Raspberry P
 ## 🏗️ Project Overview
 
 This repository provides automated installation and configuration scripts for:
+- **Essentials Setup**: Initial system preparation and configuration file setup
 - **Initial System Setup**: Base system configuration, WiFi, users, and packages
 - **Theme Customization**: Desktop wallpapers, splash screens, and visual effects
 - **X735 Power Management**: GeekWorm X735 power management board support
@@ -15,6 +16,10 @@ This repository provides automated installation and configuration scripts for:
 ```
 raspberry-config/
 ├── install.sh                 # Main installation orchestrator
+├── essentials/                # Essential setup and utilities
+│   ├── install_essentials.sh # System preparation script
+│   ├── utils.sh              # Common utility functions
+│   └── README.md             # Essentials documentation
 ├── init/                      # Initial system setup
 │   ├── init.sh               # System initialization script
 │   ├── pi-config.conf.example # Configuration template
@@ -36,17 +41,31 @@ raspberry-config/
 
 ## 🚀 Quick Start
 
-### Complete Setup (Recommended)
+### First-Time Setup (Recommended)
 
-1. **Run the installation script**:
+1. **Download the repository**:
    ```bash
-   # Download and run the complete installation (interactive)
-   curl -fsSL https://raw.githubusercontent.com/mnichols08/raspberry-config/master/install.sh | sudo bash
-   
-   # OR clone first and run locally
    git clone https://github.com/mnichols08/raspberry-config.git
    cd raspberry-config
-   sudo bash install.sh
+   ```
+
+2. **Run essentials setup first** (creates configuration file):
+   ```bash
+   sudo ./essentials/install_essentials.sh
+   ```
+
+3. **Run the main installation**:
+   ```bash
+   sudo ./install.sh
+   ```
+
+### Alternative: One-Command Setup
+
+For a quick setup that handles everything automatically:
+   ```bash
+   # Download and run with essentials setup
+   curl -fsSL https://raw.githubusercontent.com/mnichols08/raspberry-config/master/install.sh | sudo bash -s -- --essentials
+   ```
    
    # OR non-interactive installation
    sudo bash install.sh -n
