@@ -1,0 +1,3 @@
+[submodule "x735/install_files"]
+	path = x735/install_files
+	url = https://github.com/mnichols08/x735-script
