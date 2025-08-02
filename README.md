@@ -36,32 +36,37 @@ raspberry-config/
 
 ## 🚀 Quick Start
 
-### Method 1: Complete Setup (Recommended)
+### Complete Setup (Recommended)
 
-1. **Download and prepare the configuration**:
+1. **Download the repository**:
    ```bash
    # Clone the repository
    git clone https://github.com/mnichols08/raspberry-config.git
    cd raspberry-config
-   
-   # Run initial system setup
-   sudo bash init/init.sh
    ```
 
-2. **Install all components**:
+2. **Run the complete installation**:
    ```bash
-   # Interactive installation (recommended for first-time users)
+   # Interactive installation (automatically runs init + all components)
    sudo bash install.sh
    
    # OR non-interactive installation
    sudo bash install.sh -n
    ```
 
-### Method 2: Individual Component Installation
+   The main installation script will automatically:
+   - Run the initial system setup (`init/init.sh`) if needed
+   - Install all selected components
+   - Handle configuration and cleanup
 
-You can install components individually if you only need specific functionality:
+### Individual Component Installation
+
+You can also install components individually if you only need specific functionality:
 
 ```bash
+# Initial setup only
+sudo bash init/init.sh
+
 # Theme customization only
 sudo bash theme/install_theme.sh
 

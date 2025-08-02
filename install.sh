@@ -56,6 +56,9 @@ show_usage() {
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
+    echo "This script will automatically run the initial setup (init/init.sh) if needed,"
+    echo "then install the selected components."
+    echo ""
     echo "Options:"
     echo "  -n, --non-interactive    Run in non-interactive mode"
     echo "  -h, --help              Show this help message"
@@ -66,10 +69,13 @@ show_usage() {
     echo "  --no-reboot             Don't reboot after installation"
     echo ""
     echo "Examples:"
-    echo "  $0                      # Interactive installation of all components"
-    echo "  $0 -n                   # Non-interactive installation"
-    echo "  $0 --skip-gps           # Install everything except GPS"
+    echo "  $0                      # Complete setup: init + all components (interactive)"
+    echo "  $0 -n                   # Complete setup: init + all components (non-interactive)"
+    echo "  $0 --skip-gps           # Setup everything except GPS"
     echo "  $0 --temp-dir /tmp/config # Use custom temporary directory"
+    echo ""
+    echo "Note: If the configuration directory doesn't exist, the init script will be"
+    echo "      run automatically before component installation."
     echo ""
 }
 
@@ -134,11 +140,40 @@ done
 
 print_info "Starting Raspberry Pi configuration installation..."
 
-# Check if the configuration directory exists
+# Check if the configuration directory exists, if not run init script
 if [ ! -d "$TEMP_DIR" ]; then
-    print_error "Configuration directory not found: $TEMP_DIR"
-    print_error "Please run the init script first: sudo bash init/init.sh"
-    exit 1
+    print_warning "Configuration directory not found: $TEMP_DIR"
+    print_info "Running initial setup script first..."
+    
+    # Check if init script exists
+    if [ ! -f "init/init.sh" ]; then
+        print_error "Init script not found: init/init.sh"
+        print_error "Please ensure you are running this script from the project root directory"
+        exit 1
+    fi
+    
+    # Run init script with appropriate flags
+    if [ "$INTERACTIVE" = false ]; then
+        print_info "Running init script in non-interactive mode..."
+        sudo bash init/init.sh --non-interactive --temp-dir "$TEMP_DIR"
+    else
+        print_info "Running init script..."
+        sudo bash init/init.sh --temp-dir "$TEMP_DIR"
+    fi
+    
+    init_exit_code=$?
+    if [ $init_exit_code -ne 0 ]; then
+        print_error "Initial setup failed (exit code: $init_exit_code)"
+        exit 1
+    fi
+    
+    print_success "Initial setup completed successfully"
+    
+    # Verify the temp directory was created
+    if [ ! -d "$TEMP_DIR" ]; then
+        print_error "Configuration directory still not found after init: $TEMP_DIR"
+        exit 1
+    fi
 fi
 
 # Interactive configuration
@@ -146,7 +181,7 @@ if [ "$INTERACTIVE" = true ]; then
     echo ""
     print_info "=== Raspberry Pi Configuration Installation ==="
     echo ""
-    print_info "Available components:"
+    print_info "This script will automatically run initial setup if needed, then install:"
     echo "  1. Theme customization (backgrounds, splash screens)"
     echo "  2. X735 power management board support"
     echo "  3. GPS functionality setup"
