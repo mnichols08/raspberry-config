@@ -1,12 +1,19 @@
 #!/bin/bash
 
 # Raspberry Pi Configuration Installation Script
+# This script handles the complete setup process:
+# 1. Clones/downloads the configuration repository
+# 2. Runs initial system setup (init.sh) 
+# 3. Installs selected components (theme, X735, GPS)
+# 
 # Author: mnichols08
 # Date: August 2025
 
 # Default Configuration
 DEFAULT_TEMP_DIR="/var/tmp/raspberry-config"
+DEFAULT_REPO_URL="https://github.com/mnichols08/raspberry-config.git"
 TEMP_DIR="$DEFAULT_TEMP_DIR"
+REPO_URL="$DEFAULT_REPO_URL"
 
 # Colors for output
 RED='\033[0;31m'
@@ -46,6 +53,12 @@ load_config() {
                 TEMP_DIR="$value"
                 print_info "Using temp directory from config: $TEMP_DIR"
             fi
+            
+            # Set repo_url if found in config
+            if [ "$key" = "repo_url" ] && [ -n "$value" ]; then
+                REPO_URL="$value"
+                print_info "Using repository URL from config: $REPO_URL"
+            fi
         done < "$config_file"
     fi
 }
@@ -63,19 +76,21 @@ show_usage() {
     echo "  -n, --non-interactive    Run in non-interactive mode"
     echo "  -h, --help              Show this help message"
     echo "  --temp-dir DIR          Set temporary directory (default: $DEFAULT_TEMP_DIR)"
+    echo "  --repo-url URL          Set repository URL (default: $DEFAULT_REPO_URL)"
     echo "  --skip-theme            Skip theme installation"
     echo "  --skip-x735             Skip X735 power management installation"
     echo "  --skip-gps              Skip GPS installation"
     echo "  --no-reboot             Don't reboot after installation"
     echo ""
     echo "Examples:"
-    echo "  $0                      # Complete setup: init + all components (interactive)"
-    echo "  $0 -n                   # Complete setup: init + all components (non-interactive)"
+    echo "  $0                      # Complete setup: clone + init + all components (interactive)"
+    echo "  $0 -n                   # Complete setup: clone + init + all components (non-interactive)"
     echo "  $0 --skip-gps           # Setup everything except GPS"
     echo "  $0 --temp-dir /tmp/config # Use custom temporary directory"
+    echo "  $0 --repo-url https://github.com/user/fork.git # Use forked repository"
     echo ""
-    echo "Note: If the configuration directory doesn't exist, the init script will be"
-    echo "      run automatically before component installation."
+    echo "Note: The script will automatically clone the repository, run initial setup,"
+    echo "      and install selected components."
     echo ""
 }
 
@@ -114,6 +129,16 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        --repo-url)
+            if [ -n "$2" ]; then
+                REPO_URL="$2"
+                print_info "Using custom repository URL: $REPO_URL"
+                shift 2
+            else
+                print_error "--repo-url requires a URL"
+                exit 1
+            fi
+            ;;
         --skip-theme)
             INSTALL_THEME=false
             shift
@@ -140,25 +165,57 @@ done
 
 print_info "Starting Raspberry Pi configuration installation..."
 
-# Check if the configuration directory exists, if not run init script
-if [ ! -d "$TEMP_DIR" ]; then
-    print_warning "Configuration directory not found: $TEMP_DIR"
-    print_info "Running initial setup script first..."
-    
-    # Check if init script exists
-    if [ ! -f "init/init.sh" ]; then
-        print_error "Init script not found: init/init.sh"
-        print_error "Please ensure you are running this script from the project root directory"
+# Ensure we have git installed
+if ! command -v git >/dev/null 2>&1; then
+    print_info "Installing git..."
+    sudo apt update && sudo apt install -y git
+    if [ $? -ne 0 ]; then
+        print_error "Failed to install git"
         exit 1
     fi
+    print_success "Git installed successfully"
+fi
+
+# Create temporary directory
+print_info "Creating temporary directory: $TEMP_DIR"
+sudo mkdir -p "$TEMP_DIR"
+if [ $? -ne 0 ]; then
+    print_error "Failed to create temporary directory: $TEMP_DIR"
+    exit 1
+fi
+
+# Clone or update the repository
+print_info "Downloading configuration files from: $REPO_URL"
+if [ -d "$TEMP_DIR/.git" ]; then
+    print_info "Repository already exists, updating..."
+    cd "$TEMP_DIR" && sudo git pull
+else
+    print_info "Cloning repository..."
+    sudo git clone "$REPO_URL" "$TEMP_DIR"
+fi
+
+if [ $? -ne 0 ]; then
+    print_error "Failed to download configuration files from: $REPO_URL"
+    exit 1
+fi
+
+print_success "Configuration files downloaded successfully"
+
+# Make scripts executable
+print_info "Making scripts executable..."
+sudo find "$TEMP_DIR" -name "*.sh" -exec chmod +x {} \;
+
+# Now check if we need to run the init script
+if [ ! -f "$TEMP_DIR/init/.init_completed" ]; then
+    print_info "Running initial setup script..."
     
     # Run init script with appropriate flags
     if [ "$INTERACTIVE" = false ]; then
         print_info "Running init script in non-interactive mode..."
-        sudo bash init/init.sh --non-interactive --temp-dir "$TEMP_DIR"
+        sudo bash "$TEMP_DIR/init/init.sh" --non-interactive --temp-dir "$TEMP_DIR"
     else
         print_info "Running init script..."
-        sudo bash init/init.sh --temp-dir "$TEMP_DIR"
+        sudo bash "$TEMP_DIR/init/init.sh" --temp-dir "$TEMP_DIR"
     fi
     
     init_exit_code=$?
@@ -169,11 +226,10 @@ if [ ! -d "$TEMP_DIR" ]; then
     
     print_success "Initial setup completed successfully"
     
-    # Verify the temp directory was created
-    if [ ! -d "$TEMP_DIR" ]; then
-        print_error "Configuration directory still not found after init: $TEMP_DIR"
-        exit 1
-    fi
+    # Create completion marker
+    sudo touch "$TEMP_DIR/init/.init_completed"
+else
+    print_info "Initial setup already completed, skipping..."
 fi
 
 # Interactive configuration
@@ -181,10 +237,13 @@ if [ "$INTERACTIVE" = true ]; then
     echo ""
     print_info "=== Raspberry Pi Configuration Installation ==="
     echo ""
-    print_info "This script will automatically run initial setup if needed, then install:"
-    echo "  1. Theme customization (backgrounds, splash screens)"
-    echo "  2. X735 power management board support"
-    echo "  3. GPS functionality setup"
+    print_info "This script will:"
+    print_info "1. Download the latest configuration files from the repository"
+    print_info "2. Run initial system setup (hostname, WiFi, password, etc.)"
+    print_info "3. Install selected components:"
+    echo "     - Theme customization (backgrounds, splash screens)"
+    echo "     - X735 power management board support"
+    echo "     - GPS functionality setup"
     echo ""
     
     if [ "$INSTALL_THEME" = true ]; then

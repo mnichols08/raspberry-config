@@ -366,56 +366,8 @@ else
     print_warning "You may need to configure WiFi manually"
 fi
 
-# Install git if not present
-if ! command -v git >/dev/null 2>&1; then
-    print_info "Installing git..."
-    sudo apt install -y git
-    if [ $? -eq 0 ]; then
-        print_success "Git installed successfully"
-    else
-        print_error "Failed to install git"
-        exit 1
-    fi
-fi
-
-# Create a temporary directory for the installation files
-print_info "Creating temporary directory: $TEMP_DIR"
-sudo mkdir -p "$TEMP_DIR"
-if [ $? -eq 0 ]; then
-    print_success "Temporary directory created"
-else
-    print_error "Failed to create temporary directory"
-    exit 1
-fi
-
-# Download the configuration repository
-print_info "Downloading configuration files from: $REPO_URL"
-if [ -d "$TEMP_DIR/.git" ]; then
-    print_info "Repository already exists, updating..."
-    cd "$TEMP_DIR" && sudo git pull
-else
-    sudo git clone "$REPO_URL" "$TEMP_DIR"
-fi
-
-if [ $? -eq 0 ]; then
-    print_success "Configuration files downloaded successfully"
-else
-    print_error "Failed to download configuration files"
-    exit 1
-fi
-
-# Make scripts executable
-print_info "Making scripts executable..."
-sudo find "$TEMP_DIR" -name "*.sh" -exec chmod +x {} \;
-
 print_success "Initial setup completed successfully!"
 echo ""
-print_info "Next steps:"
-print_info "1. Run the main installation script: sudo bash $TEMP_DIR/install.sh"
-print_info "2. Or run individual component scripts as needed"
-print_info ""
-print_info "Available components:"
-print_info "- Theme installation: sudo bash $TEMP_DIR/theme/install_theme.sh"
-print_info "- X735 power management: sudo bash $TEMP_DIR/x735/x735_install.sh"
-print_info "- GPS setup: sudo bash $TEMP_DIR/gps-berry/gpsberry_install.sh"
+print_info "System configuration complete. The main installation script will now continue"
+print_info "with component installation."
 echo ""

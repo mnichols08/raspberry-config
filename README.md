@@ -38,24 +38,23 @@ raspberry-config/
 
 ### Complete Setup (Recommended)
 
-1. **Download the repository**:
+1. **Run the installation script**:
    ```bash
-   # Clone the repository
+   # Download and run the complete installation (interactive)
+   curl -fsSL https://raw.githubusercontent.com/mnichols08/raspberry-config/master/install.sh | sudo bash
+   
+   # OR clone first and run locally
    git clone https://github.com/mnichols08/raspberry-config.git
    cd raspberry-config
-   ```
-
-2. **Run the complete installation**:
-   ```bash
-   # Interactive installation (automatically runs init + all components)
    sudo bash install.sh
    
    # OR non-interactive installation
    sudo bash install.sh -n
    ```
 
-   The main installation script will automatically:
-   - Run the initial system setup (`init/init.sh`) if needed
+   The installation script will automatically:
+   - Download/clone the latest configuration files
+   - Run the initial system setup (hostname, WiFi, password, etc.)
    - Install all selected components
    - Handle configuration and cleanup
 
@@ -64,6 +63,10 @@ raspberry-config/
 You can also install components individually if you only need specific functionality:
 
 ```bash
+# Clone the repository first
+git clone https://github.com/mnichols08/raspberry-config.git
+cd raspberry-config
+
 # Initial setup only
 sudo bash init/init.sh
 
