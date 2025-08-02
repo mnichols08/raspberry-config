@@ -58,9 +58,9 @@ sudo apt install pcmanfm git picom
 ```
 
 ### Directory Structure
-The script expects the raspberry-config repository to be available at `/var/tmp/raspberry-config/` with the following structure:
+The script expects the raspberry-config repository to be available at `/var/tmp/raspberry-config/` by default, or at a custom location specified in the configuration file. The expected structure is:
 ```
-/var/tmp/raspberry-config/
+/var/tmp/raspberry-config/  (or custom temp_dir)
 └── theme/
   ├── background/
   │   ├── *.jpg, *.png, *.bmp, *.gif (wallpaper images)
@@ -69,6 +69,13 @@ The script expects the raspberry-config repository to be available at `/var/tmp/
   │   └── *.h264 (startup videos)
   ├── install_theme.sh
   └── openautopro.splash.service
+```
+
+### Configuration File Support
+The script supports using a configuration file to specify custom paths and settings. The configuration file should follow the same format as `pi-config.conf`:
+```
+# Installation Configuration
+temp_dir=/custom/path/to/raspberry-config
 ```
 
 ## Installation
@@ -104,6 +111,21 @@ git clone https://github.com/mnichols08/raspberry-config.git /var/tmp/raspberry-
 ./install_theme.sh -y
 ```
 
+### Configuration File Mode
+```bash
+# Use a custom configuration file
+./install_theme.sh --config /path/to/pi-config.conf
+
+# Combine with non-interactive mode
+./install_theme.sh --config /path/to/pi-config.conf --non-interactive
+```
+
+### Help
+```bash
+# Display usage information
+./install_theme.sh --help
+```
+
 ## Usage Examples
 
 ### Interactive Installation
@@ -133,13 +155,54 @@ In non-interactive mode:
 - Desktop effects default to "minimal" for best performance
 - No user prompts are shown
 
+### Configuration File Usage
+```bash
+# Create a configuration file (or use existing pi-config.conf)
+cat > my-theme-config.conf << 'EOF'
+# Custom installation path
+temp_dir=/home/pi/my-raspberry-config
+
+# Other configuration options can be included but are ignored by theme script
+hostname=MyPi
+EOF
+
+# Use configuration file with the theme installer
+./install_theme.sh --config my-theme-config.conf
+
+# For fully automated deployment with custom paths
+./install_theme.sh --config /etc/raspberry-config/pi-config.conf --non-interactive
+```
+
+#### Configuration File Format
+The theme installation script reads the `temp_dir` value from the configuration file to determine where to look for the raspberry-config repository. The configuration file uses a simple `key=value` format:
+
+```bash
+# Lines starting with # are comments
+temp_dir=/custom/installation/path
+
+# Values with spaces should be quoted
+# temp_dir="/path/with spaces/raspberry-config"
+
+# Other configuration values are ignored by the theme script
+hostname=MyDevice
+wifi_ssid=MyNetwork
+```
+
+#### Benefits of Using Configuration Files
+- **Consistent Paths**: Use the same configuration across multiple scripts
+- **Custom Locations**: Install to non-standard directories
+- **Automation**: Perfect for deployment scripts and configuration management
+- **Flexibility**: Different environments can use different base paths
+
 ## File Locations
 
 ### Source Files
 | Component | Source Location |
 |-----------|----------------|
-| Images/Videos | `/var/tmp/raspberry-config/x735/background/` |
-| Service Template | `/var/tmp/raspberry-config/theme/openautopro.splash.service` |
+| Images/Videos | `${temp_dir}/theme/background/` (default: `/var/tmp/raspberry-config/theme/background/`) |
+| Service Template | `${temp_dir}/theme/openautopro.splash.service` (default: `/var/tmp/raspberry-config/theme/openautopro.splash.service`) |
+
+**Note**: `${temp_dir}` refers to the value specified in the configuration file or the default `/var/tmp/raspberry-config` if no configuration file is used.
 
 ### Destination Files
 | Component | Destination Location |
@@ -197,9 +260,10 @@ The script configures desktop compositing through Picom with several preset leve
 #### "No image files found"
 **Cause**: No supported image formats in the background directory
 **Solution**: 
-- Verify image files are present in `/var/tmp/raspberry-config/x735/background/`
+- Verify image files are present in `${temp_dir}/theme/background/` (check your configuration file for the correct path)
 - Ensure files have supported extensions (.jpg, .jpeg, .png, .bmp, .gif)
 - Check file permissions
+- Verify the configuration file path is correct if using `--config`
 
 #### "Failed to set wallpaper"
 **Cause**: PCManFM not installed or display issues
@@ -223,9 +287,27 @@ export DISPLAY=:0
 # Check internet connection
 ping github.com
 
-# Ensure sufficient permissions
+# Ensure sufficient permissions for default location
 sudo rm -rf /var/tmp/raspberry-config
 sudo mkdir -p /var/tmp
+
+# Or use custom location with proper permissions
+mkdir -p /home/pi/raspberry-config
+# Then use: ./install_theme.sh --config /path/to/config-with-custom-temp_dir.conf
+```
+
+#### Configuration file not found
+**Cause**: Invalid path specified with `--config` option
+**Solution**:
+```bash
+# Verify the configuration file exists
+ls -la /path/to/your/config.conf
+
+# Check file format and ensure temp_dir is properly set
+grep temp_dir /path/to/your/config.conf
+
+# Use absolute paths for configuration files
+./install_theme.sh --config /full/path/to/pi-config.conf
 ```
 
 #### Desktop effects not working
@@ -263,11 +345,34 @@ bash -x ./install_theme.sh
 
 ## Advanced Usage
 
-### Custom Image Directories
-To use images from a different location, modify the script variables:
+### Custom Installation Paths
+To use a custom installation path, create a configuration file:
 ```bash
-# Edit the script to change source paths
-BACKGROUND_SOURCE="/path/to/your/images"
+# Create configuration file
+cat > /home/pi/my-config.conf << 'EOF'
+temp_dir=/home/pi/my-raspberry-config
+EOF
+
+# Clone repository to custom location
+git clone https://github.com/mnichols08/raspberry-config.git /home/pi/my-raspberry-config
+
+# Run installer with custom configuration
+cd /home/pi/my-raspberry-config/theme
+./install_theme.sh --config /home/pi/my-config.conf
+```
+
+### Custom Image Directories
+To use images from a different location within your installation:
+```bash
+# Place your custom images in the theme/background directory
+mkdir -p /custom/path/raspberry-config/theme/background
+cp /path/to/your/images/* /custom/path/raspberry-config/theme/background/
+
+# Update configuration file
+echo "temp_dir=/custom/path/raspberry-config" > custom-config.conf
+
+# Run installer
+./install_theme.sh --config custom-config.conf
 ```
 
 ### Adding New Videos
@@ -345,3 +450,4 @@ For issues and questions:
 - **v2.1**: Added non-interactive mode support
 - **v2.2**: Improved error handling and user feedback
 - **v3.0**: Added desktop effects and compositing configuration
+- **v3.1**: Added configuration file support for custom installation paths
