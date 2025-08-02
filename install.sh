@@ -59,6 +59,30 @@ load_config() {
                 REPO_URL="$value"
                 print_info "Using repository URL from config: $REPO_URL"
             fi
+            
+            # Set hostname if found in config
+            if [ "$key" = "hostname" ] && [ -n "$value" ] && [ -z "$INIT_HOSTNAME" ]; then
+                INIT_HOSTNAME="$value"
+                print_info "Using hostname from config: $INIT_HOSTNAME"
+            fi
+            
+            # Set password if found in config
+            if [ "$key" = "pi_password" ] && [ -n "$value" ] && [ -z "$INIT_PASSWORD" ]; then
+                INIT_PASSWORD="$value"
+                print_info "Using password from config: [hidden]"
+            fi
+            
+            # Set WiFi SSID if found in config
+            if [ "$key" = "wifi_ssid" ] && [ -n "$value" ] && [ -z "$INIT_WIFI_SSID" ]; then
+                INIT_WIFI_SSID="$value"
+                print_info "Using WiFi SSID from config: $INIT_WIFI_SSID"
+            fi
+            
+            # Set WiFi key if found in config
+            if [ "$key" = "wifi_password" ] && [ -n "$value" ] && [ -z "$INIT_WIFI_KEY" ]; then
+                INIT_WIFI_KEY="$value"
+                print_info "Using WiFi key from config: [hidden]"
+            fi
         done < "$config_file"
     fi
 }
@@ -77,6 +101,11 @@ show_usage() {
     echo "  -h, --help              Show this help message"
     echo "  --temp-dir DIR          Set temporary directory (default: $DEFAULT_TEMP_DIR)"
     echo "  --repo-url URL          Set repository URL (default: $DEFAULT_REPO_URL)"
+    echo "  -c, --config FILE       Load configuration from file"
+    echo "  --hostname HOSTNAME     Set hostname for initial setup"
+    echo "  --password PASSWORD     Set pi user password for initial setup"
+    echo "  --wifi-ssid SSID        Set WiFi SSID for initial setup"
+    echo "  --wifi-key KEY          Set WiFi password for initial setup"
     echo "  --skip-theme            Skip theme installation"
     echo "  --skip-x735             Skip X735 power management installation"
     echo "  --skip-gps              Skip GPS installation"
@@ -88,9 +117,11 @@ show_usage() {
     echo "  $0 --skip-gps           # Setup everything except GPS"
     echo "  $0 --temp-dir /tmp/config # Use custom temporary directory"
     echo "  $0 --repo-url https://github.com/user/fork.git # Use forked repository"
+    echo "  $0 --hostname MyPi --password secret --wifi-ssid MyNet --wifi-key wifipass -n"
+    echo "                          # Non-interactive with custom configuration"
     echo ""
     echo "Note: The script will automatically clone the repository, run initial setup,"
-    echo "      and install selected components."
+    echo "      and install selected components. Configuration arguments are passed to init script."
     echo ""
 }
 
@@ -100,6 +131,13 @@ INSTALL_THEME=true
 INSTALL_X735=true
 INSTALL_GPS=true
 DO_REBOOT=true
+
+# Configuration variables to pass to init script
+INIT_HOSTNAME=""
+INIT_PASSWORD=""
+INIT_WIFI_SSID=""
+INIT_WIFI_KEY=""
+INIT_CONFIG_FILE=""
 
 # Try to load configuration from default locations
 for config_path in "init/pi-config.conf" "/etc/pi-config.conf" "/var/tmp/raspberry-config/init/pi-config.conf"; do
@@ -136,6 +174,56 @@ while [[ $# -gt 0 ]]; do
                 shift 2
             else
                 print_error "--repo-url requires a URL"
+                exit 1
+            fi
+            ;;
+        -c|--config)
+            if [ -n "$2" ]; then
+                INIT_CONFIG_FILE="$2"
+                print_info "Using config file: $INIT_CONFIG_FILE"
+                shift 2
+            else
+                print_error "--config requires a file path"
+                exit 1
+            fi
+            ;;
+        --hostname)
+            if [ -n "$2" ]; then
+                INIT_HOSTNAME="$2"
+                print_info "Using hostname: $INIT_HOSTNAME"
+                shift 2
+            else
+                print_error "--hostname requires a hostname"
+                exit 1
+            fi
+            ;;
+        --password)
+            if [ -n "$2" ]; then
+                INIT_PASSWORD="$2"
+                print_info "Using custom password: [hidden]"
+                shift 2
+            else
+                print_error "--password requires a password"
+                exit 1
+            fi
+            ;;
+        --wifi-ssid)
+            if [ -n "$2" ]; then
+                INIT_WIFI_SSID="$2"
+                print_info "Using WiFi SSID: $INIT_WIFI_SSID"
+                shift 2
+            else
+                print_error "--wifi-ssid requires an SSID"
+                exit 1
+            fi
+            ;;
+        --wifi-key)
+            if [ -n "$2" ]; then
+                INIT_WIFI_KEY="$2"
+                print_info "Using WiFi key: [hidden]"
+                shift 2
+            else
+                print_error "--wifi-key requires a password"
                 exit 1
             fi
             ;;
@@ -209,14 +297,45 @@ sudo find "$TEMP_DIR" -name "*.sh" -exec chmod +x {} \;
 if [ ! -f "$TEMP_DIR/init/.init_completed" ]; then
     print_info "Running initial setup script..."
     
-    # Run init script with appropriate flags
+    # Build init script arguments
+    init_args=""
+    
+    # Add non-interactive flag if needed
     if [ "$INTERACTIVE" = false ]; then
-        print_info "Running init script in non-interactive mode..."
-        sudo bash "$TEMP_DIR/init/init.sh" --non-interactive --temp-dir "$TEMP_DIR"
-    else
-        print_info "Running init script..."
-        sudo bash "$TEMP_DIR/init/init.sh" --temp-dir "$TEMP_DIR"
+        init_args="$init_args --non-interactive"
     fi
+    
+    # Add temp directory
+    init_args="$init_args --temp-dir \"$TEMP_DIR\""
+    
+    # Add configuration file if specified
+    if [ -n "$INIT_CONFIG_FILE" ]; then
+        init_args="$init_args --config \"$INIT_CONFIG_FILE\""
+    fi
+    
+    # Add hostname if specified
+    if [ -n "$INIT_HOSTNAME" ]; then
+        init_args="$init_args --hostname \"$INIT_HOSTNAME\""
+    fi
+    
+    # Add password if specified
+    if [ -n "$INIT_PASSWORD" ]; then
+        init_args="$init_args --password \"$INIT_PASSWORD\""
+    fi
+    
+    # Add WiFi SSID if specified
+    if [ -n "$INIT_WIFI_SSID" ]; then
+        init_args="$init_args --wifi-ssid \"$INIT_WIFI_SSID\""
+    fi
+    
+    # Add WiFi key if specified
+    if [ -n "$INIT_WIFI_KEY" ]; then
+        init_args="$init_args --wifi-key \"$INIT_WIFI_KEY\""
+    fi
+    
+    # Run init script with constructed arguments
+    print_info "Running init script with arguments: $(echo $init_args | sed 's/--password "[^"]*"/--password [hidden]/g' | sed 's/--wifi-key "[^"]*"/--wifi-key [hidden]/g')"
+    eval "sudo bash \"$TEMP_DIR/init/init.sh\" $init_args"
     
     init_exit_code=$?
     if [ $init_exit_code -ne 0 ]; then
@@ -245,6 +364,17 @@ if [ "$INTERACTIVE" = true ]; then
     echo "     - X735 power management board support"
     echo "     - GPS functionality setup"
     echo ""
+    
+    # Show configuration that will be passed to init script if any is set
+    if [ -n "$INIT_HOSTNAME" ] || [ -n "$INIT_PASSWORD" ] || [ -n "$INIT_WIFI_SSID" ] || [ -n "$INIT_WIFI_KEY" ] || [ -n "$INIT_CONFIG_FILE" ]; then
+        print_info "Configuration for initial setup:"
+        [ -n "$INIT_HOSTNAME" ] && echo "  Hostname: $INIT_HOSTNAME"
+        [ -n "$INIT_PASSWORD" ] && echo "  Password: [hidden]"
+        [ -n "$INIT_WIFI_SSID" ] && echo "  WiFi SSID: $INIT_WIFI_SSID"
+        [ -n "$INIT_WIFI_KEY" ] && echo "  WiFi Key: [hidden]"
+        [ -n "$INIT_CONFIG_FILE" ] && echo "  Config File: $INIT_CONFIG_FILE"
+        echo ""
+    fi
     
     if [ "$INSTALL_THEME" = true ]; then
         echo -n "Install theme customization? [Y/n]: "

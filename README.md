@@ -147,6 +147,12 @@ sudo bash install.sh [OPTIONS]
 | `-n, --non-interactive` | Run without user prompts | `sudo bash install.sh -n` |
 | `-h, --help` | Show help message | `sudo bash install.sh --help` |
 | `--temp-dir DIR` | Set custom temporary directory | `sudo bash install.sh --temp-dir /tmp/config` |
+| `--repo-url URL` | Set custom repository URL | `sudo bash install.sh --repo-url https://github.com/user/fork.git` |
+| `-c, --config FILE` | Load configuration from file | `sudo bash install.sh --config /path/to/config.conf` |
+| `--hostname HOSTNAME` | Set hostname for initial setup | `sudo bash install.sh --hostname MyPi` |
+| `--password PASSWORD` | Set pi user password | `sudo bash install.sh --password MySecurePass` |
+| `--wifi-ssid SSID` | Set WiFi network name | `sudo bash install.sh --wifi-ssid MyNetwork` |
+| `--wifi-key KEY` | Set WiFi password | `sudo bash install.sh --wifi-key MyWiFiPass` |
 | `--skip-theme` | Skip theme installation | `sudo bash install.sh --skip-theme` |
 | `--skip-x735` | Skip X735 installation | `sudo bash install.sh --skip-x735` |
 | `--skip-gps` | Skip GPS installation | `sudo bash install.sh --skip-gps` |
@@ -320,21 +326,24 @@ Complete automated setup for deployment:
 #!/bin/bash
 # automated-setup.sh
 
-# Set environment variables
+# Method 1: Using command line arguments
+sudo bash install.sh \
+  --non-interactive \
+  --hostname "raspberrypi-$(date +%s)" \
+  --password "MySecurePassword123" \
+  --wifi-ssid "MyNetwork" \
+  --wifi-key "MyWiFiPassword" \
+  --temp-dir "/opt/pi-setup" \
+  --skip-gps
+
+# Method 2: Using environment variables (more secure)
 export PI_PASSWORD="MySecurePassword123"
-export WIFI_SSID="MyNetwork"
+export WIFI_SSID="MyNetwork" 
 export WIFI_PASSWORD="MyWiFiPassword"
 export PI_HOSTNAME="raspberrypi-$(date +%s)"
 
-# Download and setup
-git clone https://github.com/mnichols08/raspberry-config.git
-cd raspberry-config
-
-# Initial setup
-sudo -E bash init/init.sh --non-interactive
-
-# Install all components
-sudo bash install.sh --non-interactive --temp-dir /opt/pi-setup
+# Download and run with environment variables
+curl -fsSL https://raw.githubusercontent.com/mnichols08/raspberry-config/master/install.sh | sudo -E bash -s -- --non-interactive
 
 echo "Automated setup complete!"
 ```
