@@ -293,6 +293,9 @@ print_success "Configuration files downloaded successfully"
 print_info "Making scripts executable..."
 sudo find "$TEMP_DIR" -name "*.sh" -exec chmod +x {} \;
 
+# Fix hostname resolution issues
+fix_hostname_resolution
+
 # Now check if we need to run the init script
 if [ ! -f "$TEMP_DIR/init/.init_completed" ]; then
     print_info "Running initial setup script..."
@@ -453,9 +456,30 @@ run_installation() {
     fi
 }
 
+# Function to fix hostname resolution
+fix_hostname_resolution() {
+    local current_hostname=$(hostname)
+    print_info "Fixing hostname resolution for: $current_hostname"
+    
+    # Check if hostname is in /etc/hosts
+    if ! grep -q "127.0.1.1.*$current_hostname" /etc/hosts; then
+        print_info "Adding hostname to /etc/hosts..."
+        
+        # Remove any existing 127.0.1.1 entries
+        sudo sed -i '/^127.0.1.1/d' /etc/hosts
+        
+        # Add the current hostname
+        echo "127.0.1.1       $current_hostname" | sudo tee -a /etc/hosts > /dev/null
+        print_success "Hostname resolution configured"
+    else
+        print_info "Hostname already configured in /etc/hosts"
+    fi
+}
+
 # Installation counter
 INSTALLED_COUNT=0
 FAILED_COUNT=0
+
 
 # Customize the Theme
 if [ "$INSTALL_THEME" = true ]; then
