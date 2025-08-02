@@ -1,0 +1,25 @@
+# Raspberry Pi Configuration File
+# This file contains sensitive configuration values for the init script
+# Keep this file secure and never commit it to version control
+
+# System Configuration
+hostname=MyRaspberryPi
+
+# User Credentials
+pi_password=YourSecurePassword123
+
+# WiFi Configuration
+wifi_ssid=YourNetworkName
+wifi_password=YourWiFiPassword
+
+# Repository Configuration (optional)
+repo_url=https://github.com/mnichols08/raspberry-config.git
+
+# Installation Configuration
+temp_dir=/var/tmp/raspberry-config
+
+# Notes:
+# - Lines starting with # are comments and are ignored
+# - You can use either lowercase or uppercase variable names
+# - Values with spaces should be quoted: wifi_ssid="My Network Name"
+# - This file should have restricted permissions: chmod 600 pi-config.conf
