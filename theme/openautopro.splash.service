@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenAuto Pro Splash service
+DefaultDependencies=no
+Requires=local-fs.target
+After=local-fs.target
+
+[Service]
+User=pi
+Type=oneshot
+Restart=no
+Environment="OPENAUTO_SPLASH_VIDEOS=/usr/share/openautopro/rix_splash.h264"
+Environment="OPENAUTO_DELAY_EXIT_MS=1500"
+ExecStart=/usr/local/bin/openauto_splash
+
+[Install]
+WantedBy=sysinit.target
