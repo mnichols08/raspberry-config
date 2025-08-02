@@ -7,7 +7,13 @@ This repository contain### Non-Interactiv### Installation Options
 sudo ./x735_install.sh --help
 
 # Non-interactive mode (alias) - useful for automation
-sudo ./x735_install.sh -n
+sudo ./x735_install.sh -y
+
+# Custom temporary directory
+sudo ./x735_install.sh --temp-dir /custom/temp/path
+
+# Combined options
+sudo ./x735_install.sh --non-interactive --temp-dir /custom/temp/path
 ```
 
 ### Integration with Larger Scripts
@@ -20,11 +26,11 @@ If you're building a comprehensive Raspberry Pi setup script, you can integrate 
 
 # ... other system setup tasks ...
 
-# Install X735 power management (non-interactive)
+# Install X735 power management (non-interactive with custom temp dir)
 if [[ -d "x735" ]]; then
     echo "Installing X735 Power Management Board..."
     cd x735
-    sudo ./x735_install.sh --non-interactive
+    sudo ./x735_install.sh --non-interactive --temp-dir /opt/setup-temp
     cd ..
 else
     echo "X735 directory not found, skipping X735 installation"
@@ -120,6 +126,20 @@ For automated deployments or scripts:
 sudo ./x735/x735_install.sh --non-interactive
 ```
 
+### Custom Temporary Directory
+
+By default, the installation script uses `/var/tmp/raspberry-config` as the temporary directory for downloads and intermediate files. You can specify a custom location:
+
+```bash
+# Use custom temporary directory
+sudo ./x735_install.sh --temp-dir /opt/my-setup-temp
+
+# Combined with non-interactive mode
+sudo ./x735_install.sh --non-interactive --temp-dir /opt/my-setup-temp
+```
+
+**Note**: The temporary directory path must be an absolute path and the script will create it if it doesn't exist.
+
 ### Installation Options
 
 ```bash
@@ -127,7 +147,13 @@ sudo ./x735/x735_install.sh --non-interactive
 sudo ./x735/x735_install.sh --help
 
 # Non-interactive mode (alias)
-sudo ./x735/x735_install.sh -n
+sudo ./x735/x735_install.sh -y
+
+# Custom temporary directory
+sudo ./x735/x735_install.sh --temp-dir /custom/temp/path
+
+# Combined options
+sudo ./x735/x735_install.sh --non-interactive --temp-dir /custom/temp/path
 ```
 
 ### What the Installation Does

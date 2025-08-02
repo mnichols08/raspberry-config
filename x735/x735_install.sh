@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # Interactive GeekWorm X735 Power Management Board Installation Script
-# Usage: sudo ./install_x735.sh [--non-interactive]
+# Usage: sudo ./install_x735.sh [--non-interactive] [--temp-dir PATH]
 #        --non-interactive: Run without prompts, auto-reboot at end
-#         -n: Alias for --non-interactive
+#         -y: Alias for --non-interactive
+#        --temp-dir PATH: Specify custom temporary directory (default: /var/tmp/raspberry-config)
 #        --help: Show this help message
 #        -h: Alias for --help
 # Author: Mikey Nichols
@@ -13,13 +14,20 @@ set -e  # Exit on any error
 # Global flag for non-interactive mode
 NON_INTERACTIVE=false
 
+# Global variable for temporary directory
+TEMP_DIR="/var/tmp/raspberry-config"
+
 # Parse command line arguments
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --non-interactive | -n)
+            --non-interactive | -y)
                 NON_INTERACTIVE=true
                 shift
+                ;;
+            --temp-dir)
+                TEMP_DIR="$2"
+                shift 2
                 ;;
             -h|--help)
                 echo "GeekWorm X735 Power Management Board Installation Script"
@@ -28,6 +36,7 @@ parse_arguments() {
                 echo ""
                 echo "Options:"
                 echo "  --non-interactive    Run without user prompts and auto-reboot"
+                echo "  --temp-dir PATH      Specify custom temporary directory (default: /var/tmp/raspberry-config)"
                 echo "  -h, --help          Show this help message"
                 echo ""
                 echo "When run without --non-interactive:"
@@ -46,6 +55,18 @@ parse_arguments() {
                 ;;
         esac
     done
+    
+    # Validate temp directory path
+    if [[ -z "$TEMP_DIR" ]]; then
+        print_error "Temporary directory cannot be empty"
+        exit 1
+    fi
+    
+    # Ensure temp directory is absolute path
+    if [[ "$TEMP_DIR" != /* ]]; then
+        print_error "Temporary directory must be an absolute path"
+        exit 1
+    fi
 }
 
 # Color codes for output
@@ -172,7 +193,7 @@ install_packages() {
 setup_temp_directory() {
     print_status "Setting up temporary directory..."
     
-    local temp_dir="/var/tmp/raspberry-config"
+    local temp_dir="$TEMP_DIR"
     local x735_dir="$temp_dir/x735/install_files"
     
     # Create temp directory if it doesn't exist
@@ -255,7 +276,7 @@ setup_temp_directory() {
 
 # Function to install services
 install_services() {
-    local x735_dir="/var/tmp/raspberry-config/x735/install-files"
+    local x735_dir="$TEMP_DIR/x735/install_files"
     
     print_status "Installing X735 fan service..."
     if "$x735_dir/install-fan-service.sh"; then
@@ -286,8 +307,8 @@ install_services() {
 
 # Function to install xSoft utility
 install_xsoft() {
-    local x735_dir="/var/tmp/raspberry-config/x735/install_files"
-    local x735_bin_dir="/var/tmp/raspberry-config/x735/bin"
+    local x735_dir="$TEMP_DIR/x735/install_files"
+    local x735_bin_dir="$TEMP_DIR/x735/bin"
     
     print_status "Installing xSoft utility..."
     
@@ -377,7 +398,7 @@ create_start_menu_entries() {
     local user_home
     
     # Try to get the user's home directory
-    if [[ -n "$SUDO_USER" ]]; then
+    if [[ -y "$SUDO_USER" ]]; then
         user_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
         user_home="$HOME"
@@ -454,7 +475,7 @@ Keywords=X735;Fan;Power;GeekWorm;Raspberry;Pi;"
             chmod +x "$desktop_file"
             
             # Change ownership to the actual user
-            if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+            if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
                 chown "$default_user:$default_user" "$desktop_file" 2>/dev/null || true
             fi
         else
@@ -475,13 +496,13 @@ Icon=folder-system"
     if echo "$folder_content" > "$folder_file"; then
         print_success "Created X735 tools folder entry"
         # Change ownership to the actual user
-        if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+        if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
             chown "$default_user:$default_user" "$folder_file" 2>/dev/null || true
         fi
     fi
     
     # Fix ownership of the entire .local/share/applications directory
-    if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+    if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
         chown -R "$default_user:$default_user" "$user_home/.local" 2>/dev/null || true
     fi
     
@@ -540,7 +561,7 @@ verify_installation() {
     # Check if start menu entries were created
     local default_user="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
     local user_home
-    if [[ -n "$SUDO_USER" ]]; then
+    if [[ -y "$SUDO_USER" ]]; then
         user_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
         user_home="$HOME"
@@ -606,6 +627,7 @@ show_post_install_info() {
 install_x735() {
     echo
     print_status "=== Starting GeekWorm X735 Power Management Board Installation ==="
+    print_status "Using temporary directory: $TEMP_DIR"
     echo
     
     # Run all installation steps
@@ -642,7 +664,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             sleep 5
             reboot
         else
-            read -p "Would you like to reboot now to enable the changes? (y/N): " -n 1 -r
+            read -p "Would you like to reboot now to enable the changes? (y/N): " -y 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_status "Rebooting in 5 seconds... Press Ctrl+C to cancel"
