@@ -2,18 +2,87 @@
 
 # Interactive Theme Installation Script
 # This script allows users to select background images and wallpaper modes
-# Usage: ./install_theme.sh [--non-interactive|-y]
+# Usage: ./install_theme.sh [--non-interactive|-y] [--config|-c CONFIG_FILE]
 
 
-# Check for non-interactive mode
+# Default values
 NON_INTERACTIVE=false
+CONFIG_FILE=""
+BASE_DIR="/var/tmp/raspberry-config"
 
 # Set the display environment variable
 # This is necessary for GUI applications to run correctly
 export DISPLAY=:0
 
-if [[ "$1" == "--non-interactive" ]] || [[ "$1" == "-y" ]]; then
-    NON_INTERACTIVE=true
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  --non-interactive, -y     Run in non-interactive mode"
+    echo "  --config, -c CONFIG_FILE  Use specified configuration file"
+    echo "  --help, -h               Show this help message"
+    echo
+    echo "Example:"
+    echo "  $0 --config /path/to/pi-config.conf --non-interactive"
+}
+
+# Function to parse configuration file
+parse_config_file() {
+    local config_file="$1"
+    
+    if [ ! -f "$config_file" ]; then
+        echo "Error: Configuration file not found: $config_file"
+        exit 1
+    fi
+    
+    echo "Reading configuration from: $config_file"
+    
+    # Parse temp_dir from config file
+    local temp_dir_value
+    temp_dir_value=$(grep -E "^[[:space:]]*temp_dir[[:space:]]*=" "$config_file" | head -1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^"//;s/"$//')
+    
+    if [ -n "$temp_dir_value" ]; then
+        BASE_DIR="$temp_dir_value"
+        echo "Using temp_dir from config: $BASE_DIR"
+    else
+        echo "Warning: temp_dir not found in config file, using default: $BASE_DIR"
+    fi
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --non-interactive|-y)
+            NON_INTERACTIVE=true
+            shift
+            ;;
+        --config|-c)
+            CONFIG_FILE="$2"
+            if [ -z "$CONFIG_FILE" ]; then
+                echo "Error: --config requires a configuration file path"
+                show_usage
+                exit 1
+            fi
+            shift 2
+            ;;
+        --help|-h)
+            show_usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Parse configuration file if provided
+if [ -n "$CONFIG_FILE" ]; then
+    parse_config_file "$CONFIG_FILE"
+fi
+
+if [ "$NON_INTERACTIVE" = true ]; then
     echo "=== Raspberry Pi Theme Installation (Non-Interactive Mode) ==="
 else
     echo "=== Raspberry Pi Theme Installation ==="
@@ -558,18 +627,18 @@ start_compositor() {
 }
 
 # Check if background images directory exists
-BACKGROUND_SOURCE="/var/tmp/raspberry-config/theme/background"
+BACKGROUND_SOURCE="$BASE_DIR/theme/background"
 BACKGROUND_DEST="/usr/share/background"
 
 # Video configuration
-VIDEO_SOURCE="/var/tmp/raspberry-config/theme/videos"
+VIDEO_SOURCE="$BASE_DIR/theme/videos"
 VIDEO_DEST="/usr/share/openautopro"
-SERVICE_SOURCE="/var/tmp/raspberry-config/theme/openautopro.splash.service"
+SERVICE_SOURCE="$BASE_DIR/theme/openautopro.splash.service"
 SERVICE_DEST="/etc/systemd/system/openautopro.splash.service"
 
 if [ ! -d "$BACKGROUND_SOURCE" ]; then
     echo "Error: Background source directory not found at $BACKGROUND_SOURCE"
-    echo "Please ensure the raspberry-config repository is properly extracted to /var/tmp/"
+    echo "Please ensure the raspberry-config repository is properly extracted to $BASE_DIR/"
     
     if [ "$NON_INTERACTIVE" = true ]; then
         echo "Non-interactive mode: Cannot proceed without source directory. Exiting."
@@ -579,8 +648,8 @@ if [ ! -d "$BACKGROUND_SOURCE" ]; then
     read -p "Would you like to clone the raspberry-config repository now? (y/n): " clone_choice
     if [[ $clone_choice =~ ^[Yy]$ ]]; then
         echo "Cloning raspberry-config repository..."
-        sudo rm -rf /var/tmp/raspberry-config 2>/dev/null
-        if git clone https://github.com/mnichols08/raspberry-config.git /var/tmp/raspberry-config; then
+        sudo rm -rf "$BASE_DIR" 2>/dev/null
+        if git clone https://github.com/mnichols08/raspberry-config.git "$BASE_DIR"; then
             echo "Repository cloned successfully!"
             echo "Please run this script again."
             exit 0
@@ -589,7 +658,7 @@ if [ ! -d "$BACKGROUND_SOURCE" ]; then
             exit 1
         fi
     else
-        echo "Please manually clone the repository to /var/tmp/raspberry-config and run this script again."
+        echo "Please manually clone the repository to $BASE_DIR and run this script again."
     fi
     exit 1
 fi
