@@ -398,7 +398,7 @@ create_start_menu_entries() {
     local user_home
     
     # Try to get the user's home directory
-    if [[ -y "$SUDO_USER" ]]; then
+    if [[ -n "$SUDO_USER" ]]; then
         user_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
         user_home="$HOME"
@@ -475,7 +475,7 @@ Keywords=X735;Fan;Power;GeekWorm;Raspberry;Pi;"
             chmod +x "$desktop_file"
             
             # Change ownership to the actual user
-            if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+            if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
                 chown "$default_user:$default_user" "$desktop_file" 2>/dev/null || true
             fi
         else
@@ -496,13 +496,13 @@ Icon=folder-system"
     if echo "$folder_content" > "$folder_file"; then
         print_success "Created X735 tools folder entry"
         # Change ownership to the actual user
-        if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+        if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
             chown "$default_user:$default_user" "$folder_file" 2>/dev/null || true
         fi
     fi
     
     # Fix ownership of the entire .local/share/applications directory
-    if [[ -y "$default_user" ]] && [[ "$default_user" != "root" ]]; then
+    if [[ -n "$default_user" ]] && [[ "$default_user" != "root" ]]; then
         chown -R "$default_user:$default_user" "$user_home/.local" 2>/dev/null || true
     fi
     
@@ -526,7 +526,7 @@ verify_installation() {
     fi
     
     # Check if xSoft utility exists and is executable
-    if [[ -x /usr/local/bin/x735/xSoft.sh ]] && [[ -L /usr/local/bin/x375/xSoft ]]; then
+    if [[ -x /usr/local/bin/x735/xSoft.sh ]] && [[ -L /usr/local/bin/xSoft ]]; then
         print_success "✓ xSoft utility installed and accessible"
         ((checks_passed++))
     else
@@ -561,7 +561,7 @@ verify_installation() {
     # Check if start menu entries were created
     local default_user="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
     local user_home
-    if [[ -y "$SUDO_USER" ]]; then
+    if [[ -n "$SUDO_USER" ]]; then
         user_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     else
         user_home="$HOME"
@@ -664,7 +664,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             sleep 5
             reboot
         else
-            read -p "Would you like to reboot now to enable the changes? (y/N): " -y 1 -r
+            read -p "Would you like to reboot now to enable the changes? (y/N): " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_status "Rebooting in 5 seconds... Press Ctrl+C to cancel"
