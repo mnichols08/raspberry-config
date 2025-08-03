@@ -8,14 +8,49 @@
 # Usage: Run this script as root or with sudo privileges.
 # Author: Mikey Nichols
 
-# Color codes for better visual feedback
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-PURPLE='\033[0;35m'
-NC='\033[0m' # No Color
+# Import shared utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UTILS_PATH="$SCRIPT_DIR/../essentials/utils.sh"
+GPS_UTILS_PATH="$SCRIPT_DIR/gps_utils.sh"
+
+# Load shared utilities if available
+if [ -f "$UTILS_PATH" ]; then
+    source "$UTILS_PATH"
+    echo "✓ Loaded shared utilities from: $UTILS_PATH"
+fi
+
+# Load GPS-specific utilities if available
+if [ -f "$GPS_UTILS_PATH" ]; then
+    source "$GPS_UTILS_PATH"
+    echo "✓ Loaded GPS utilities from: $GPS_UTILS_PATH"
+fi
+
+# Fallback color codes for better visual feedback (if utils.sh not loaded)
+if [ -z "$RED" ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    PURPLE='\033[0;35m'
+    NC='\033[0m' # No Color
+fi
+
+# Fallback functions (will be overridden if utils.sh is loaded)
+if ! command -v print_info >/dev/null 2>&1; then
+    print_info() { echo -e "${BLUE}ℹ  $@${NC}"; }
+    print_success() { echo -e "${GREEN}✓ $@${NC}"; }
+    print_warning() { echo -e "${YELLOW}⚠  $@${NC}"; }
+    print_error() { echo -e "${RED}✗ $@${NC}"; }
+    
+    log_message() {
+        local level=$1
+        shift
+        local message="$@"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    }
+fi
 
 # Global variables
 INTERACTIVE=true

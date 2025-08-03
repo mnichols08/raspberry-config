@@ -9,13 +9,46 @@
 ## Usage: Run this script as root or with sudo privileges.
 ## Author: Mikey Nichols
 
-# Color codes for better visual feedback
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# Fallback functions if utils.sh is not available
+# These will be overridden by utils.sh if it's loaded
+
+# Fallback color codes for better visual feedback (if utils.sh not loaded)
+if [ -z "$RED" ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    NC='\033[0m' # No Color
+fi
+
+# Fallback functions (will be overridden if utils.sh is loaded)
+if ! command -v print_info >/dev/null 2>&1; then
+    print_info() { echo -e "${BLUE}ℹ  $@${NC}"; }
+    print_success() { echo -e "${GREEN}✓ $@${NC}"; }
+    print_warning() { echo -e "${YELLOW}⚠  $@${NC}"; }
+    print_error() { echo -e "${RED}✗ $@${NC}"; }
+    
+    log_message() {
+        local level=$1
+        shift
+        local message="$@"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    }
+fi
+
+# Import shared utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UTILS_PATH="$SCRIPT_DIR/../essentials/utils.sh"
+
+if [ -f "$UTILS_PATH" ]; then
+    source "$UTILS_PATH"
+    echo "✓ Loaded shared utilities from: $UTILS_PATH"
+else
+    echo "⚠ Warning: Shared utilities not found at: $UTILS_PATH"
+    echo "   Continuing with local functions..."
+fi
 
 # Global variables
 INTERACTIVE=true
@@ -45,41 +78,16 @@ show_usage() {
     echo "  $0 -n --skip-update         # Non-interactive, skip updates"
 }
 
-# Function to log messages
-log_message() {
-    local level=$1
-    shift
-    local message="$@"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+# GPS-specific status functions
+print_status() {
+    print_info "$@"
 }
 
-# Function to print colored output
+# Function to print colored output (enhanced version using utils or fallback)
 print_color() {
     local color=$1
     shift
     echo -e "${color}$@${NC}"
-}
-
-# Function to print status messages
-print_status() {
-    print_color $BLUE "ℹ  $@"
-    log_message "INFO" "$@"
-}
-
-print_success() {
-    print_color $GREEN "✓ $@"
-    log_message "SUCCESS" "$@"
-}
-
-print_warning() {
-    print_color $YELLOW "⚠  $@"
-    log_message "WARNING" "$@"
-}
-
-print_error() {
-    print_color $RED "✗ $@"
-    log_message "ERROR" "$@"
 }
 
 # Function to ask yes/no questions
@@ -264,29 +272,43 @@ install_gps_packages() {
         return 0
     fi
     
-    # Check if packages are available
-    for package in $packages; do
-        if ! apt-cache show "$package" >/dev/null 2>&1; then
-            print_warning "Package '$package' not available in repositories"
+    # Use shared install function if available, otherwise fallback
+    if command -v install_packages >/dev/null 2>&1; then
+        print_status "Using shared package installation function..."
+        if install_packages $packages; then
+            print_success "GPS packages installed successfully using shared utilities"
+        else
+            print_error "Failed to install GPS packages"
+            exit 1
         fi
-    done
-    
-    if sudo apt-get install $packages -y; then
-        print_success "GPS packages installed successfully"
-        
-        # Show installed versions
-        echo "Installed versions:"
-        dpkg -l | grep -E "(gpsd|gpsd-clients|python3-gps|minicom)" | awk '{print "  " $2 " " $3}'
-        
-        # Check service status
-        if systemctl is-enabled gpsd >/dev/null 2>&1; then
-            print_status "GPSD service: $(systemctl is-enabled gpsd)"
-        fi
-        
     else
-        print_error "Failed to install GPS packages"
-        exit 1
+        # Fallback to local implementation
+        print_status "Using local package installation..."
+        
+        # Check if packages are available
+        for package in $packages; do
+            if ! apt-cache show "$package" >/dev/null 2>&1; then
+                print_warning "Package '$package' not available in repositories"
+            fi
+        done
+        
+        if sudo apt-get install $packages -y; then
+            print_success "GPS packages installed successfully"
+        else
+            print_error "Failed to install GPS packages"
+            exit 1
+        fi
     fi
+    
+    # Show installed versions
+    echo "Installed versions:"
+    dpkg -l | grep -E "(gpsd|gpsd-clients|python3-gps|minicom)" | awk '{print "  " $2 " " $3}'
+    
+    # Check service status
+    if systemctl is-enabled gpsd >/dev/null 2>&1; then
+        print_status "GPSD service: $(systemctl is-enabled gpsd)"
+    fi
+    
     echo
 }
 
@@ -301,10 +323,16 @@ configure_serial() {
         return 0
     fi
     
-    # Backup configuration files
+    # Backup configuration files using shared function if available
     print_status "Creating configuration backups..."
-    sudo cp /boot/config.txt /boot/config.txt.backup.$(date +%Y%m%d_%H%M%S)
-    sudo cp /boot/cmdline.txt /boot/cmdline.txt.backup.$(date +%Y%m%d_%H%M%S)
+    if command -v backup_file >/dev/null 2>&1; then
+        backup_file "/boot/config.txt"
+        backup_file "/boot/cmdline.txt"
+    else
+        # Fallback backup method
+        sudo cp /boot/config.txt /boot/config.txt.backup.$(date +%Y%m%d_%H%M%S)
+        sudo cp /boot/cmdline.txt /boot/cmdline.txt.backup.$(date +%Y%m%d_%H%M%S)
+    fi
     
     if sudo raspi-config nonint do_serial 2; then
         print_success "Serial configuration updated"
@@ -587,11 +615,19 @@ main() {
     fi
 }
 
-# Check if running as root/sudo
-if [ "$EUID" -ne 0 ] && [ "$DRY_RUN" = false ]; then
-    print_error "This script must be run as root or with sudo privileges"
-    print_status "Try: sudo $0 $*"
-    exit 1
+# Check if running as root/sudo (use shared function if available)
+if command -v check_permissions >/dev/null 2>&1; then
+    if [ "$DRY_RUN" = false ] && ! check_permissions; then
+        print_status "Try: sudo $0 $*"
+        exit 1
+    fi
+else
+    # Fallback permission check
+    if [ "$EUID" -ne 0 ] && [ "$DRY_RUN" = false ]; then
+        print_error "This script must be run as root or with sudo privileges"
+        print_status "Try: sudo $0 $*"
+        exit 1
+    fi
 fi
 
 # Run main function with all arguments
