@@ -240,6 +240,40 @@ setup_temp_directory() {
         fi
     fi
     
+    # Verify source directory has required files before copying
+    local source_install_dir="$source_x735_dir/install_files"
+    local required_scripts=("install-fan-service.sh" "install-pwr-service.sh" "xSoft.sh" "install-sss.sh")
+    
+    print_status "Verifying source files exist..."
+    for script in "${required_scripts[@]}"; do
+        if [[ ! -f "$source_install_dir/$script" ]]; then
+            print_error "Required script not found in source: $source_install_dir/$script"
+            print_error "The submodule may not be properly initialized."
+            
+            # Try to initialize/update submodule one more time
+            if command -v git >/dev/null 2>&1; then
+                local repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+                if [[ -n "$repo_root" ]]; then
+                    print_status "Attempting to reinitialize submodule..."
+                    if git -C "$repo_root" submodule update --init --recursive --force; then
+                        if [[ -f "$source_install_dir/$script" ]]; then
+                            print_success "Submodule reinitialized successfully"
+                        else
+                            print_error "Submodule reinitialization failed"
+                            return 1
+                        fi
+                    else
+                        print_error "Failed to reinitialize submodule"
+                        return 1
+                    fi
+                fi
+            else
+                return 1
+            fi
+        fi
+    done
+    print_success "All required source files found"
+    
     # Copy the x735 directory to temp location
     print_status "Copying X735 files to temporary directory..."
     if cp -r "$source_x735_dir" "$temp_x735_dir"; then
@@ -249,18 +283,23 @@ setup_temp_directory() {
         return 1
     fi
     
-    # Verify required scripts exist
+    # Verify copied files exist
     local x735_install_dir="$temp_x735_dir/install_files"
-    local required_scripts=("install-fan-service.sh" "install-pwr-service.sh" "xSoft.sh" "install-sss.sh")
+    print_status "Verifying copied files..."
     for script in "${required_scripts[@]}"; do
         if [[ ! -f "$x735_install_dir/$script" ]]; then
-            print_error "Required script not found: $x735_install_dir/$script"
+            print_error "Required script not found after copy: $x735_install_dir/$script"
             return 1
         fi
     done
+    print_success "All required files verified in temporary directory"
     
+    # Set execute permissions on scripts
     print_status "Setting execute permissions on scripts..."
-    chmod +x "$x735_install_dir"/*.sh "$temp_x735_dir/bin"/*.py "$temp_x735_dir/bin"/*.sh 2>/dev/null || true
+    chmod +x "$x735_install_dir"/*.sh 2>/dev/null || true
+    if [[ -d "$temp_x735_dir/bin" ]]; then
+        chmod +x "$temp_x735_dir/bin"/*.py "$temp_x735_dir/bin"/*.sh 2>/dev/null || true
+    fi
     print_success "Execute permissions set"
     
     return 0

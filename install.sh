@@ -14,10 +14,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source utility functions if available
-if [ -f "$SCRIPT_DIR/essentials/utils.sh" ]; then
-    source "$SCRIPT_DIR/essentials/utils.sh"
+if [ -f "$SCRIPT_DIR/utils/utils.sh" ]; then
+    source "$SCRIPT_DIR/utils/utils.sh"
 else
-    # Fallback color definitions if utils not available
+    # Fallback color definitions and functions if utils not available
     RED='\033[0;31m'
     GREEN='\033[0;32m'
     YELLOW='\033[1;33m'
@@ -27,6 +27,13 @@ else
     print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
     print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
     print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+    check_permissions() {
+        if [ "$EUID" -ne 0 ]; then
+            print_error "This script must be run as root or with sudo"
+            return 1
+        fi
+        return 0
+    }
 fi
 
 # Default Configuration
@@ -167,8 +174,7 @@ done
 print_info "Starting Raspberry Pi configuration installation..."
 
 # Check permissions
-if ! check_permissions 2>/dev/null; then
-    print_error "This script must be run as root or with sudo"
+if ! check_permissions; then
     exit 1
 fi
 
@@ -205,7 +211,9 @@ if [ "$RUN_ESSENTIALS" = true ] || [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Load configuration from file
-load_config "$CONFIG_FILE" 2>/dev/null
+if [ -f "$CONFIG_FILE" ]; then
+    load_config "$CONFIG_FILE"
+fi
 
 # Override with configuration file values if they exist
 [ -n "$CONFIG_temp_dir" ] && TEMP_DIR="$CONFIG_temp_dir"
