@@ -288,20 +288,74 @@ setup_temp_directory() {
     
     # Copy the x735 directory to temp location
     print_status "Copying X735 files to temporary directory..."
-    if cp -r "$source_x735_dir" "$temp_x735_dir"; then
-        print_success "X735 files copied to: $temp_x735_dir"
+    
+    # Create the target directory structure
+    if mkdir -p "$temp_x735_dir/install_files"; then
+        print_status "Created target directory structure"
     else
-        print_error "Failed to copy X735 files"
+        print_error "Failed to create target directory structure"
         return 1
     fi
     
+    # Copy the install_files directory contents, excluding .git
+    if cp -r "$source_x735_dir/install_files"/* "$temp_x735_dir/install_files/" 2>/dev/null; then
+        print_success "X735 install_files copied to: $temp_x735_dir/install_files/"
+    else
+        print_error "Failed to copy X735 install_files"
+        return 1
+    fi
+    
+    # Copy other files from the x735 directory if they exist
+    for file in "$source_x735_dir"/*; do
+        if [[ -f "$file" ]] && [[ "$(basename "$file")" != "x735_install.sh" ]]; then
+            cp "$file" "$temp_x735_dir/" 2>/dev/null || true
+        fi
+    done
+    
+    # Create bin directory if Python scripts exist in install_files
+    if [[ -f "$temp_x735_dir/install_files/pwm_fan_control.py" ]] || [[ -f "$temp_x735_dir/install_files/read_fan_speed.py" ]]; then
+        print_status "Creating bin directory and copying Python scripts..."
+        mkdir -p "$temp_x735_dir/bin"
+        
+        # Copy Python scripts to bin directory
+        if [[ -f "$temp_x735_dir/install_files/pwm_fan_control.py" ]]; then
+            cp "$temp_x735_dir/install_files/pwm_fan_control.py" "$temp_x735_dir/bin/"
+        fi
+        if [[ -f "$temp_x735_dir/install_files/read_fan_speed.py" ]]; then
+            cp "$temp_x735_dir/install_files/read_fan_speed.py" "$temp_x735_dir/bin/"
+        fi
+        if [[ -f "$temp_x735_dir/install_files/uninstall.sh" ]]; then
+            cp "$temp_x735_dir/install_files/uninstall.sh" "$temp_x735_dir/bin/"
+        fi
+        print_success "Python scripts copied to bin directory"
+    fi
+    
+    print_success "X735 files copied to: $temp_x735_dir"
+    
     # Verify copied files exist
     local x735_install_dir="$temp_x735_dir/install_files"
-    print_status "Verifying copied files..."
+    print_status "Verifying copied files in: $x735_install_dir"
+    
+    # First, check if the install_files directory exists
+    if [[ ! -d "$x735_install_dir" ]]; then
+        print_error "install_files directory not found: $x735_install_dir"
+        print_status "Contents of temp directory:"
+        ls -la "$temp_x735_dir" 2>/dev/null || print_error "Could not list temp directory"
+        return 1
+    fi
+    
+    # List what's actually in the directory for debugging
+    print_status "Contents of $x735_install_dir:"
+    ls -la "$x735_install_dir" 2>/dev/null || print_error "Could not list install_files directory"
+    
+    # Check each required script
     for script in "${required_scripts[@]}"; do
-        if [[ ! -f "$x735_install_dir/$script" ]]; then
-            print_error "Required script not found after copy: $x735_install_dir/$script"
+        local script_path="$x735_install_dir/$script"
+        if [[ ! -f "$script_path" ]]; then
+            print_error "Required script not found after copy: $script_path"
             return 1
+        else
+            print_status "✓ Verified: $script"
         fi
     done
     print_success "All required files verified in temporary directory"
