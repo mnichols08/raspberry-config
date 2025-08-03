@@ -434,6 +434,20 @@ install_xsoft() {
     print_status "Ensuring /usr/local/bin/x735 directory exists..."
     if [[ -d /usr/local/bin/x735 ]]; then
         print_status "/usr/local/bin/x735 directory already exists"
+    elif [[ -e /usr/local/bin/x735 ]]; then
+        print_warning "/usr/local/bin/x735 exists but is not a directory, removing it..."
+        if rm -f /usr/local/bin/x735; then
+            print_status "Removed existing file, creating directory..."
+            if mkdir -p /usr/local/bin/x735; then
+                print_success "/usr/local/bin/x735 directory created"
+            else
+                print_error "Failed to create /usr/local/bin/x735 directory"
+                return 1
+            fi
+        else
+            print_error "Failed to remove existing file /usr/local/bin/x735"
+            return 1
+        fi
     else
         if mkdir -p /usr/local/bin/x735; then
             print_success "/usr/local/bin/x735 directory created"
