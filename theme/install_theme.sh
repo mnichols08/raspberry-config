@@ -17,6 +17,34 @@ if [ -z "$DISPLAY" ]; then
     export DISPLAY=:0
 fi
 
+# Function to check and install required X11 tools
+check_x11_tools() {
+    local missing_tools=()
+    
+    # Check for xset (part of x11-xserver-utils)
+    if ! command -v xset &> /dev/null; then
+        missing_tools+=("x11-xserver-utils")
+    fi
+    
+    # Check for pcmanfm
+    if ! command -v pcmanfm &> /dev/null; then
+        missing_tools+=("pcmanfm")
+    fi
+    
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        echo "Missing required tools: ${missing_tools[*]}"
+        echo "Installing missing tools..."
+        sudo apt update && sudo apt install -y "${missing_tools[@]}"
+        
+        if [ $? -ne 0 ]; then
+            echo "Warning: Failed to install some required tools. GUI features may not work properly."
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
 # Function to show usage
 show_usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -91,6 +119,10 @@ else
     echo "=== Raspberry Pi Theme Installation ==="
 fi
 echo
+
+# Check and install required X11 tools
+echo "Checking for required tools..."
+check_x11_tools
 
 # Function to configure compositing manager
 configure_compositing() {
@@ -539,13 +571,25 @@ start_compositor() {
     pkill -f "picom\|compton" 2>/dev/null || true
     sleep 1
     
-    # Ensure DISPLAY is set for GUI applications
+    # Ensure DISPLAY and X11 authentication are properly set
     export DISPLAY=:0
     
-    # Start new compositor in background
-    DISPLAY=:0 "$compositor" --config "$HOME/.config/picom/picom.conf" --daemon
+    # Set up X11 authentication if running as different user
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "$USER" ]; then
+        export XAUTHORITY="/home/$SUDO_USER/.Xauthority"
+    elif [ -z "$XAUTHORITY" ]; then
+        export XAUTHORITY="$HOME/.Xauthority"
+    fi
     
-    echo "✓ Compositor started"
+    # Test X11 connection before starting compositor
+    if xset q >/dev/null 2>&1; then
+        # Start new compositor in background
+        DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" "$compositor" --config "$HOME/.config/picom/picom.conf" --daemon
+        echo "✓ Compositor started"
+    else
+        echo "⚠ Warning: Cannot connect to X11 display. Compositor not started."
+        echo "The compositor will start automatically on next login."
+    fi
 }
 
 # Check if background images directory exists
@@ -692,14 +736,70 @@ echo "Setting wallpaper..."
 echo "Image: $(basename "$selected_image")"
 echo "Mode: $selected_mode"
 
-# Ensure DISPLAY is set for GUI applications
+# Ensure DISPLAY and X11 authentication are properly set for GUI applications
 export DISPLAY=:0
 
-if DISPLAY=:0 pcmanfm --set-wallpaper="$selected_image" --wallpaper-mode="$selected_mode"; then
-    echo "✓ Wallpaper set successfully!"
+# Set up X11 authentication if running as different user
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "$USER" ]; then
+    # Running under sudo, need to set up X11 auth for the original user
+    export XAUTHORITY="/home/$SUDO_USER/.Xauthority"
+    echo "Setting up X11 authentication for user: $SUDO_USER"
 else
-    echo "✗ Failed to set wallpaper. Please check if pcmanfm is installed and the image file is valid."
-    exit 1
+    # Set XAUTHORITY if not already set
+    if [ -z "$XAUTHORITY" ]; then
+        export XAUTHORITY="$HOME/.Xauthority"
+    fi
+fi
+
+# Test X11 connection before attempting to set wallpaper
+echo "Testing X11 connection..."
+if ! xset q >/dev/null 2>&1; then
+    echo "Warning: Cannot connect to X11 display. Attempting to fix..."
+    
+    # Try to find the correct DISPLAY and XAUTHORITY
+    for display_num in 0 1 2; do
+        export DISPLAY=":$display_num"
+        if xset q >/dev/null 2>&1; then
+            echo "Found working display: $DISPLAY"
+            break
+        fi
+    done
+    
+    # If still no luck, try to get from running X session
+    if ! xset q >/dev/null 2>&1; then
+        if [ -n "$SUDO_USER" ]; then
+            # Get display from user's processes
+            user_display=$(sudo -u "$SUDO_USER" ps -eo pid,cmd | grep -E "Xorg|X :" | head -1 | grep -oE ":[0-9]+" | head -1)
+            if [ -n "$user_display" ]; then
+                export DISPLAY="$user_display"
+                echo "Found user's display: $DISPLAY"
+            fi
+        fi
+    fi
+fi
+
+# Final test before proceeding
+if ! xset q >/dev/null 2>&1; then
+    echo "✗ Cannot establish X11 connection. Wallpaper setting requires X11."
+    echo "Please ensure:"
+    echo "  1. X11 is running (desktop environment is active)"
+    echo "  2. DISPLAY environment variable is correctly set"
+    echo "  3. You have proper X11 authentication permissions"
+    echo
+    echo "You can manually set the wallpaper later using:"
+    echo "  DISPLAY=:0 pcmanfm --set-wallpaper=\"$selected_image\" --wallpaper-mode=\"$selected_mode\""
+    echo
+    echo "Continuing with other configuration..."
+else
+    echo "✓ X11 connection successful"
+    
+    if DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" pcmanfm --set-wallpaper="$selected_image" --wallpaper-mode="$selected_mode"; then
+        echo "✓ Wallpaper set successfully!"
+    else
+        echo "✗ Failed to set wallpaper. Please check if pcmanfm is installed and the image file is valid."
+        echo "You can manually set the wallpaper using:"
+        echo "  DISPLAY=$DISPLAY pcmanfm --set-wallpaper=\"$selected_image\" --wallpaper-mode=\"$selected_mode\""
+    fi
 fi
 
 # Handle startup video configuration
