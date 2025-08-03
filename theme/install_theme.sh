@@ -12,7 +12,10 @@ BASE_DIR="/var/tmp/raspberry-config"
 
 # Set the display environment variable
 # This is necessary for GUI applications to run correctly
-export DISPLAY=:0
+# Check if DISPLAY is already set, otherwise default to :0
+if [ -z "$DISPLAY" ]; then
+    export DISPLAY=:0
+fi
 
 # Function to show usage
 show_usage() {
@@ -519,7 +522,7 @@ create_compositor_autostart() {
 Type=Application
 Name=Picom Compositor
 Comment=Desktop compositing manager
-Exec=${compositor} --config ~/.config/picom/picom.conf
+Exec=env DISPLAY=:0 ${compositor} --config ~/.config/picom/picom.conf
 Terminal=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -536,8 +539,11 @@ start_compositor() {
     pkill -f "picom\|compton" 2>/dev/null || true
     sleep 1
     
+    # Ensure DISPLAY is set for GUI applications
+    export DISPLAY=:0
+    
     # Start new compositor in background
-    "$compositor" --config "$HOME/.config/picom/picom.conf" --daemon
+    DISPLAY=:0 "$compositor" --config "$HOME/.config/picom/picom.conf" --daemon
     
     echo "✓ Compositor started"
 }
@@ -686,7 +692,10 @@ echo "Setting wallpaper..."
 echo "Image: $(basename "$selected_image")"
 echo "Mode: $selected_mode"
 
-if pcmanfm --set-wallpaper="$selected_image" --wallpaper-mode="$selected_mode"; then
+# Ensure DISPLAY is set for GUI applications
+export DISPLAY=:0
+
+if DISPLAY=:0 pcmanfm --set-wallpaper="$selected_image" --wallpaper-mode="$selected_mode"; then
     echo "✓ Wallpaper set successfully!"
 else
     echo "✗ Failed to set wallpaper. Please check if pcmanfm is installed and the image file is valid."
