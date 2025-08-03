@@ -240,14 +240,23 @@ setup_temp_directory() {
         fi
     fi
     
+    # Ensure source_x735_dir is set before proceeding
+    if [[ -z "$source_x735_dir" ]]; then
+        print_error "Failed to determine X735 source directory"
+        return 1
+    fi
+    
     # Verify source directory has required files before copying
     local source_install_dir="$source_x735_dir/install_files"
     local required_scripts=("install-fan-service.sh" "install-pwr-service.sh" "xSoft.sh" "install-sss.sh")
     
-    print_status "Verifying source files exist..."
+    print_status "Verifying source files exist in: $source_install_dir"
     for script in "${required_scripts[@]}"; do
-        if [[ ! -f "$source_install_dir/$script" ]]; then
-            print_error "Required script not found in source: $source_install_dir/$script"
+        local script_path="$source_install_dir/$script"
+        if [[ ! -f "$script_path" ]]; then
+            print_error "Required script not found: $script_path"
+            print_status "Directory contents:"
+            ls -la "$source_install_dir" 2>/dev/null || print_error "Could not list directory contents"
             print_error "The submodule may not be properly initialized."
             
             # Try to initialize/update submodule one more time
@@ -256,10 +265,11 @@ setup_temp_directory() {
                 if [[ -n "$repo_root" ]]; then
                     print_status "Attempting to reinitialize submodule..."
                     if git -C "$repo_root" submodule update --init --recursive --force; then
-                        if [[ -f "$source_install_dir/$script" ]]; then
-                            print_success "Submodule reinitialized successfully"
+                        # Re-check after submodule update
+                        if [[ -f "$script_path" ]]; then
+                            print_success "Submodule reinitialized successfully - script now found"
                         else
-                            print_error "Submodule reinitialization failed"
+                            print_error "Submodule reinitialization completed but script still not found: $script_path"
                             return 1
                         fi
                     else
@@ -270,6 +280,8 @@ setup_temp_directory() {
             else
                 return 1
             fi
+        else
+            print_status "✓ Found: $script"
         fi
     done
     print_success "All required source files found"
