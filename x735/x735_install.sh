@@ -188,13 +188,14 @@ install_packages() {
 }
 
 # Function to setup temporary installation directory
-# This function will clone the x735-script repository if not found locally
-# and ensure all required scripts are present
+# This function will ensure the x735 installation files are available
+# and copy them to the working directory structure
 setup_temp_directory() {
     print_status "Setting up temporary directory..."
     
     local temp_dir="$TEMP_DIR"
-    local x735_dir="$temp_dir/x735/install_files"
+    local temp_x735_dir="$temp_dir/x735"
+    local source_x735_dir
     
     # Create temp directory if it doesn't exist
     if [[ ! -d "$temp_dir" ]]; then
@@ -202,73 +203,64 @@ setup_temp_directory() {
         print_success "Created temporary directory: $temp_dir"
     fi
     
-    # Ensure x735-script submodule is updated
-    print_status "Updating X735 script submodule..."
-    if command -v git >/dev/null 2>&1; then
-        if git submodule update --init --recursive "$x735_dir"; then
-            print_success "X735 submodule updated successfully"
-            # Ensure the install_files directory exists
-            if [[ ! -d "$x735_dir" ]]; then
-                print_error "X735 install_files directory not found after update"
-                return 1
-            fi
-        elif [[ $? -eq 0 ]]; then
-            print_success "X735 submodule already up-to-date"
-            # Ensure the bin directory exists
-            local x735_bin_dir="$temp_dir/x735/bin"
-            if [[ ! -d "$x735_bin_dir" ]]; then
-                mkdir -p "$x735_bin_dir"
-                print_success "Created bin directory: $x735_bin_dir"
-            fi
-
-            # Copy required files to bin directory
-            print_status "Copying X735 utility files to bin directory..."
-            local source_files=("xSoft.sh" "xPWR.sh" "x735-fan.sh" "read_fan_speed.py" "uninstall.sh" "pwm_fan_control.py")
-
-            for file in "${source_files[@]}"; do
-                if [[ -f "$x735_dir/$file" ]]; then
-                    if cp "$x735_dir/$file" "$x735_bin_dir/"; then
-                        print_success "Copied $file to bin directory"
-                    else
-                        print_error "Failed to copy $file to bin directory"
-                        return 1
+    # Determine the source directory based on script location
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Check if we're running from within the repository structure
+    if [[ -d "$script_dir/install_files" ]]; then
+        source_x735_dir="$script_dir"
+        print_status "Found X735 files in script directory: $source_x735_dir"
+    elif [[ -d "$script_dir/../x735/install_files" ]]; then
+        source_x735_dir="$script_dir/../x735"
+        print_status "Found X735 files in parent directory: $source_x735_dir"
+    else
+        # Try to update submodule if we're in a git repository
+        print_status "Checking for X735 script submodule..."
+        if command -v git >/dev/null 2>&1; then
+            local repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+            if [[ -n "$repo_root" ]] && [[ -f "$repo_root/.gitmodules" ]]; then
+                print_status "Found git repository, updating submodules..."
+                if git -C "$repo_root" submodule update --init --recursive; then
+                    print_success "Submodules updated successfully"
+                    if [[ -d "$repo_root/x735/install_files" ]]; then
+                        source_x735_dir="$repo_root/x735"
+                        print_success "Found X735 files after submodule update: $source_x735_dir"
                     fi
                 else
-                    print_warning "Source file not found: $file"
+                    print_error "Failed to update submodules"
+                    return 1
                 fi
-            done
-
-            # Make the copied files executable
-            chmod +x "$x735_bin_dir"/*.sh "$x735_bin_dir"/*.py 2>/dev/null || true
-            print_success "Set execute permissions on bin files"
-        elif [[ $? -eq 1 ]]; then
-            print_error "Failed to update X735 submodule"
-            return 1
-        elif [[ $? -eq 128 ]]; then
-            print_warning "X735 submodule not initialized, initializing now..."
-            git submodule init "$x735_dir" && git submodule update "$x735_dir"
-            print_success "X735 submodule initialized and updated"  
-        else
-            print_error "Failed to update X735 submodule"
+            fi
+        fi
+        
+        # If still not found, error out
+        if [[ -z "$source_x735_dir" ]]; then
+            print_error "X735 install files not found. Please ensure you're running from the correct directory or that submodules are initialized."
             return 1
         fi
+    fi
+    
+    # Copy the x735 directory to temp location
+    print_status "Copying X735 files to temporary directory..."
+    if cp -r "$source_x735_dir" "$temp_x735_dir"; then
+        print_success "X735 files copied to: $temp_x735_dir"
     else
-        print_error "Git is not installed - cannot update submodule"
-        print_error "Please install git: sudo apt install git"
+        print_error "Failed to copy X735 files"
         return 1
     fi
     
-    # Check if required scripts exist
+    # Verify required scripts exist
+    local x735_install_dir="$temp_x735_dir/install_files"
     local required_scripts=("install-fan-service.sh" "install-pwr-service.sh" "xSoft.sh" "install-sss.sh")
     for script in "${required_scripts[@]}"; do
-        if [[ ! -f "$x735_dir/$script" ]]; then
-            print_error "Required script not found: $script"
+        if [[ ! -f "$x735_install_dir/$script" ]]; then
+            print_error "Required script not found: $x735_install_dir/$script"
             return 1
         fi
     done
     
     print_status "Setting execute permissions on scripts..."
-    chmod +x "$x735_dir"/*.sh
+    chmod +x "$x735_install_dir"/*.sh "$temp_x735_dir/bin"/*.py "$temp_x735_dir/bin"/*.sh 2>/dev/null || true
     print_success "Execute permissions set"
     
     return 0
@@ -526,7 +518,7 @@ verify_installation() {
     fi
     
     # Check if xSoft utility exists and is executable
-    if [[ -x /usr/local/bin/x735/xSoft.sh ]] && [[ -L /usr/local/bin/xSoft ]]; then
+    if [[ -x /usr/local/bin/xSoft.sh ]] && [[ -L /usr/local/bin/xSoft ]]; then
         print_success "✓ xSoft utility installed and accessible"
         ((checks_passed++))
     else
@@ -578,7 +570,7 @@ verify_installation() {
     fi
     
     echo
-    print_status "Installation verification: $((checks_passed))/$((total_checks + 1)) checks passed"
+    print_status "Installation verification: $checks_passed/$total_checks checks passed"
     
     if [[ $checks_passed -eq $total_checks ]]; then
         print_success "All checks passed! Installation appears successful."
