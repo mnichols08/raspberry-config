@@ -182,10 +182,10 @@ if [ "$RUN_ESSENTIALS" = true ] || [ ! -f "$CONFIG_FILE" ]; then
     
     # Look for essentials script
     essentials_script=""
-    if [ -f "$SCRIPT_DIR/essentials/install_essentials.sh" ]; then
-        essentials_script="$SCRIPT_DIR/essentials/install_essentials.sh"
-    elif [ -f "$TEMP_DIR/essentials/install_essentials.sh" ]; then
-        essentials_script="$TEMP_DIR/essentials/install_essentials.sh"
+    if [ -f "$SCRIPT_DIR/utils/install_essentials.sh" ]; then
+        essentials_script="$SCRIPT_DIR/utils/install_essentials.sh"
+    elif [ -f "$TEMP_DIR/utils/install_essentials.sh" ]; then
+        essentials_script="$TEMP_DIR/utils/install_essentials.sh"
     else
         print_error "Essentials setup script not found. Please run from the correct directory or clone the repository first."
         exit 1
