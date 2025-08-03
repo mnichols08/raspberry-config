@@ -152,8 +152,7 @@ create_config_file() {
         
         # Password
         echo -n "Pi user password (leave empty to skip): "
-        read -rs user_password
-        echo ""
+        read -r user_password
         
         # WiFi SSID
         echo -n "WiFi SSID (leave empty to skip): "
@@ -162,8 +161,7 @@ create_config_file() {
         # WiFi Password
         if [ -n "$user_wifi_ssid" ]; then
             echo -n "WiFi password: "
-            read -rs user_wifi_password
-            echo ""
+            read -r user_wifi_password
         fi
         
         # Temp directory
@@ -267,6 +265,11 @@ setup_git_config() {
     fi
     
     print_success "Git configuration completed"
+    echo "You can change these settings later with 'git config --global user.name' and 'git config --global user.email'."
+    echo "To set up SSH keys for git, run 'ssh-keygen -t rsa -b 4096 -C \"your_email@example.com\"'"
+    echo "" 
+    print_info "You can change these settings later with 'git config --global user.name' and 'git config --global user.email'."
+    print_info "Git configuration completed successfully"
     return 0
 }
 
