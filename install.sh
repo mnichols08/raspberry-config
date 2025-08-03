@@ -30,14 +30,17 @@ else
 fi
 
 # Default Configuration
-DEFAULT_TEMP_DIR="/var/tmp/raspberry-config"
+DEFAULT_TEMP_DIR="/var/tmp"
 DEFAULT_REPO_URL="https://github.com/mnichols08/raspberry-config.git"
-DEFAULT_CONFIG_FILE="/etc/pi-config.conf"
+DEFAULT_CONFIG_FILE="./etc/pi-config.conf"
 
 # Configuration variables
 TEMP_DIR="$DEFAULT_TEMP_DIR"
 REPO_URL="$DEFAULT_REPO_URL"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
+
+# Export temp_dir as environment variable as requested
+export temp_dir="$TEMP_DIR"
 
 # Installation flags
 INTERACTIVE=true
@@ -61,6 +64,7 @@ show_usage() {
     echo "  -h, --help              Show this help message"
     echo "  --temp-dir DIR          Set temporary directory (default: $DEFAULT_TEMP_DIR)"
     echo "  --repo-url URL          Set repository URL (default: $DEFAULT_REPO_URL)"
+    echo "  -u, --git-url URL       Set git repository URL (alias for --repo-url)"
     echo "  --config FILE           Use specific configuration file (default: $DEFAULT_CONFIG_FILE)"
     echo "  --essentials            Run essentials setup first"
     echo "  --skip-theme            Skip theme installation"
@@ -107,6 +111,15 @@ while [[ $# -gt 0 ]]; do
                 shift 2
             else
                 print_error "--repo-url requires a URL"
+                exit 1
+            fi
+            ;;
+        -u|--git-url)
+            if [ -n "$2" ]; then
+                REPO_URL="$2"
+                shift 2
+            else
+                print_error "--git-url requires a URL"
                 exit 1
             fi
             ;;
@@ -202,6 +215,15 @@ load_config "$CONFIG_FILE" 2>/dev/null
 [ -n "$CONFIG_install_gps" ] && INSTALL_GPS="$CONFIG_install_gps"
 [ -n "$CONFIG_interactive_mode" ] && INTERACTIVE="$CONFIG_interactive_mode"
 [ -n "$CONFIG_auto_reboot" ] && DO_REBOOT="$CONFIG_auto_reboot"
+
+# Update temp_dir environment variable if TEMP_DIR changed
+export temp_dir="$TEMP_DIR"
+
+# Ensure TEMP_DIR includes the raspberry-config subdirectory
+if [[ "$TEMP_DIR" != */raspberry-config ]]; then
+    TEMP_DIR="$TEMP_DIR/raspberry-config"
+    export temp_dir="$TEMP_DIR"
+fi
 
 print_info "Using configuration:"
 print_info "  Temp directory: $TEMP_DIR"
