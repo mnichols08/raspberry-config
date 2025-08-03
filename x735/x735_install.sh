@@ -431,12 +431,16 @@ install_xsoft() {
     fi
     
     # Create x735 directory in /usr/local/bin
-    print_status "Creating /usr/local/bin/x735 directory..."
-    if mkdir -p /usr/local/bin/x735; then
-        print_success "/usr/local/bin/x735 directory created"
+    print_status "Ensuring /usr/local/bin/x735 directory exists..."
+    if [[ -d /usr/local/bin/x735 ]]; then
+        print_status "/usr/local/bin/x735 directory already exists"
     else
-        print_error "Failed to create /usr/local/bin/x735 directory"
-        return 1
+        if mkdir -p /usr/local/bin/x735; then
+            print_success "/usr/local/bin/x735 directory created"
+        else
+            print_error "Failed to create /usr/local/bin/x735 directory"
+            return 1
+        fi
     fi
 
     
