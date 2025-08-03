@@ -89,90 +89,6 @@ else
 fi
 echo
 
-# Function to display available wallpaper modes
-show_wallpaper_modes() {
-    echo "Available wallpaper modes:"
-    echo "1) center    - Center the image"
-    echo "2) tile      - Tile the image"
-    echo "3) stretch   - Stretch to fit screen"
-    echo "4) fit       - Fit to screen (maintain aspect ratio)"
-    echo "5) fill      - Fill screen (may crop image)"
-    echo "6) zoom      - Zoom to fit"
-}
-
-# Function to get wallpaper mode selection
-get_wallpaper_mode() {
-    local mode_choice
-    while true; do
-        show_wallpaper_modes
-        echo
-        read -p "Select wallpaper mode (1-6): " mode_choice
-        
-        case $mode_choice in
-            1) echo "center"; break ;;
-            2) echo "tile"; break ;;
-            3) echo "stretch"; break ;;
-            4) echo "fit"; break ;;
-            5) echo "fill"; break ;;
-            6) echo "zoom"; break ;;
-            *) echo "Invalid selection. Please choose 1-6." ;;
-        esac
-    done
-}
-
-# Function to get video selection
-get_video_selection() {
-    local video_files=("$@")
-    local video_choice
-    
-    echo "Available startup videos:"
-    for i in "${!video_files[@]}"; do
-        filename=$(basename "${video_files[$i]}")
-        echo "$((i+1))) $filename"
-    done
-    
-    while true; do
-        echo
-        read -p "Select a video (1-${#video_files[@]}): " video_choice
-        
-        if [[ $video_choice =~ ^[0-9]+$ ]] && [ $video_choice -ge 1 ] && [ $video_choice -le ${#video_files[@]} ]; then
-            echo "${video_files[$((video_choice-1))]}"
-            break
-        else
-            echo "Invalid selection. Please choose a number between 1 and ${#video_files[@]}."
-        fi
-    done
-}
-
-# Function to display available desktop effects
-show_desktop_effects() {
-    echo "Available desktop effects:"
-    echo "1) none      - Disable all effects (best performance)"
-    echo "2) minimal   - Basic window animations only"
-    echo "3) standard  - Window animations + transparency"
-    echo "4) enhanced  - Full effects with shadows and blur"
-    echo "5) custom    - Configure individual effects"
-}
-
-# Function to get desktop effects selection
-get_desktop_effects() {
-    local effects_choice
-    while true; do
-        show_desktop_effects
-        echo
-        read -p "Select desktop effects level (1-5): " effects_choice
-        
-        case $effects_choice in
-            1) echo "none"; break ;;
-            2) echo "minimal"; break ;;
-            3) echo "standard"; break ;;
-            4) echo "enhanced"; break ;;
-            5) echo "custom"; break ;;
-            *) echo "Invalid selection. Please choose 1-5." ;;
-        esac
-    done
-}
-
 # Function to configure compositing manager
 configure_compositing() {
     local effects_level="$1"
@@ -737,9 +653,31 @@ if [ "$NON_INTERACTIVE" = true ]; then
     selected_mode="stretch"
     echo "Auto-selected wallpaper mode: $selected_mode"
 else
-    # Interactive mode: get wallpaper mode selection
+    # Interactive mode: display wallpaper mode choices and get selection
     echo
-    selected_mode=$(get_wallpaper_mode)
+    echo "Available wallpaper modes:"
+    echo "1) center    - Center the image"
+    echo "2) tile      - Tile the image"
+    echo "3) stretch   - Stretch to fit screen"
+    echo "4) fit       - Fit to screen (maintain aspect ratio)"
+    echo "5) fill      - Fill screen (may crop image)"
+    echo "6) zoom      - Zoom to fit"
+    
+    # Get user's mode selection
+    while true; do
+        echo
+        read -p "Select wallpaper mode (1-6): " mode_choice
+        
+        case $mode_choice in
+            1) selected_mode="center"; break ;;
+            2) selected_mode="tile"; break ;;
+            3) selected_mode="stretch"; break ;;
+            4) selected_mode="fit"; break ;;
+            5) selected_mode="fill"; break ;;
+            6) selected_mode="zoom"; break ;;
+            *) echo "Invalid selection. Please choose 1-6." ;;
+        esac
+    done
 fi
 
 # Set the wallpaper
@@ -789,9 +727,26 @@ else
         selected_video="${VIDEO_FILES[0]}"
         echo "Auto-selected video: $(basename "$selected_video")"
     else
-        # Interactive mode: get video selection
+        # Interactive mode: display video choices and get selection
         echo
-        selected_video=$(get_video_selection "${VIDEO_FILES[@]}")
+        echo "Available startup videos:"
+        for i in "${!VIDEO_FILES[@]}"; do
+            filename=$(basename "${VIDEO_FILES[$i]}")
+            echo "$((i+1))) $filename"
+        done
+        
+        # Get user's video selection
+        while true; do
+            echo
+            read -p "Select a video (1-${#VIDEO_FILES[@]}): " video_choice
+            
+            if [[ $video_choice =~ ^[0-9]+$ ]] && [ $video_choice -ge 1 ] && [ $video_choice -le ${#VIDEO_FILES[@]} ]; then
+                selected_video="${VIDEO_FILES[$((video_choice-1))]}"
+                break
+            else
+                echo "Invalid selection. Please choose a number between 1 and ${#VIDEO_FILES[@]}."
+            fi
+        done
     fi
     
     # Update the service file with selected video
@@ -804,10 +759,6 @@ else
     
     # Update the video path in the service file
     sed -i "s|Environment=\"OPENAUTO_SPLASH_VIDEOS=.*\"|Environment=\"OPENAUTO_SPLASH_VIDEOS=$selected_video\"|" "$temp_service"
-    
-    # Comment out any other video environment lines
-    sed -i 's|^Environment="OPENAUTO_SPLASH_VIDEOS=|#Environment="OPENAUTO_SPLASH_VIDEOS=|' "$temp_service"
-    sed -i "s|#Environment=\"OPENAUTO_SPLASH_VIDEOS=$selected_video\"|Environment=\"OPENAUTO_SPLASH_VIDEOS=$selected_video\"|" "$temp_service"
     
     # Copy the updated service file to the system location
     sudo cp "$temp_service" "$SERVICE_DEST"
@@ -832,9 +783,29 @@ if [ "$NON_INTERACTIVE" = true ]; then
     selected_effects="minimal"
     echo "Auto-selected desktop effects: $selected_effects"
 else
-    # Interactive mode: get effects selection
+    # Interactive mode: display effects choices and get selection
     echo
-    selected_effects=$(get_desktop_effects)
+    echo "Available desktop effects:"
+    echo "1) none      - Disable all effects (best performance)"
+    echo "2) minimal   - Basic window animations only"
+    echo "3) standard  - Window animations + transparency"
+    echo "4) enhanced  - Full effects with shadows and blur"
+    echo "5) custom    - Configure individual effects"
+    
+    # Get user's effects selection
+    while true; do
+        echo
+        read -p "Select desktop effects level (1-5): " effects_choice
+        
+        case $effects_choice in
+            1) selected_effects="none"; break ;;
+            2) selected_effects="minimal"; break ;;
+            3) selected_effects="standard"; break ;;
+            4) selected_effects="enhanced"; break ;;
+            5) selected_effects="custom"; break ;;
+            *) echo "Invalid selection. Please choose 1-5." ;;
+        esac
+    done
 fi
 
 # Configure the selected effects
