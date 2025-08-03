@@ -376,7 +376,7 @@ install_services() {
     local x735_dir="$TEMP_DIR/x735/install_files"
     
     print_status "Installing X735 fan service..."
-    if "$x735_dir/install-fan-service.sh"; then
+    if (cd "$x735_dir" && ./install-fan-service.sh); then
         print_success "Fan service installed successfully"
     else
         print_error "Failed to install fan service"
@@ -384,7 +384,7 @@ install_services() {
     fi
     
     print_status "Installing X735 power service..."
-    if "$x735_dir/install-pwr-service.sh"; then
+    if (cd "$x735_dir" && ./install-pwr-service.sh); then
         print_success "Power service installed successfully"
     else
         print_error "Failed to install power service"
@@ -392,7 +392,7 @@ install_services() {
     fi
     
     print_status "Installing X735 safe shutdown script service..."
-    if "$x735_dir/install-sss.sh"; then
+    if (cd "$x735_dir" && ./install-sss.sh); then
         print_success "Safe shutdown script service installed successfully"
     else
         print_error "Failed to install safe shutdown script service"
